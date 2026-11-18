@@ -35,7 +35,8 @@ jobs:
           mkdir -p out
           find app/build/outputs/apk -name '*.apk' -exec cp {} out/ \;
           ls -la out
-          cp out/*universal*.apk out/Jellyeye.apk
+          # the all-devices APK is the one without a processor name in it
+          cp "out/Jellyeye-release-${{ github.run_number }}.apk" out/Jellyeye.apk
           cp out/*armeabi-v7a*.apk out/Jellyeye-firestick.apk
       - name: Publish to the "latest" release
         env:
