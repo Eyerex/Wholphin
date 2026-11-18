@@ -44,6 +44,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -316,7 +318,8 @@ fun NavDrawer(
             IntOffset(
                 x =
                     with(density) {
-                        if (drawerState.isOpen) (openDrawerWidth - closedDrawerWidth).roundToPx() else 0
+                        // Jellyeye: how much room the open menu needs; the page shrinks to make room for it
+                        if (drawerState.isOpen) openDrawerWidth.roundToPx() else 0
                     },
                 y = 0,
             ),
@@ -553,8 +556,16 @@ fun NavDrawer(
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        .offset {
-                            offset
+                        // Jellyeye: instead of sliding the page off the right of the screen when the menu
+                        // opens, shrink the whole page so it all stays in view beside the menu
+                        .graphicsLayer {
+                            val room = offset.x.toFloat()
+                            if (size.width > 0f && room > 0f) {
+                                val s = ((size.width - room) / size.width).coerceIn(0.5f, 1f)
+                                scaleX = s
+                                scaleY = s
+                                transformOrigin = TransformOrigin(1f, 0.5f)
+                            }
                         }.then(
                             // Jellyeye: the home screen runs edge to edge and keeps its own margin
                             if (destination is Destination.Home) {
