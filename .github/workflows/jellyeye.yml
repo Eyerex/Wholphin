@@ -1,0 +1,49 @@
+name: Build Jellyeye
+
+# Builds the Jellyeye app every time the jellyeye branch changes (or when you press
+# "Run workflow" on the Actions tab) and puts the newest APK on the "latest" release:
+#   https://github.com/Eyerex/wholphin/releases/download/latest/Jellyeye.apk
+on:
+  push:
+    branches: [jellyeye]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  GRADLE_OPTS: "-Dorg.gradle.jvmargs='-Xmx6g -XX:MaxMetaspaceSize=1024m'"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - name: Get Wholphin's version tags (the app uses them for its version number)
+        run: git fetch --tags --force https://github.com/damontecres/Wholphin.git || true
+      - name: Setup
+        uses: ./.github/actions/setup
+      - name: Build Jellyeye
+        env:
+          JELLYEYE_BUILD: ${{ github.run_number }}
+        run: ./gradlew assembleDefaultRelease --no-daemon
+      - name: Collect the APKs
+        run: |
+          mkdir -p out
+          find app/build/outputs/apk -name '*.apk' -exec cp {} out/ \;
+          ls -la out
+          cp out/*universal*.apk out/Jellyeye.apk
+          cp out/*armeabi-v7a*.apk out/Jellyeye-firestick.apk
+      - name: Publish to the "latest" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="Build ${{ github.run_number }} from $(git rev-parse --short HEAD)
+
+          Fire Stick: install Jellyeye-firestick.apk (smaller) or Jellyeye.apk (works everywhere)."
+          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create latest out/Jellyeye.apk out/Jellyeye-firestick.apk \
+            --title "Jellyeye build ${{ github.run_number }}" --notes "$notes" --target "$(git rev-parse HEAD)" --latest

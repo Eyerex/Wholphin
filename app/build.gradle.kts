@@ -72,10 +72,14 @@ configure<ApplicationExtension> {
     compileSdk = libs.versions.compileSdk.getInt()
 
     defaultConfig {
-        applicationId = "com.github.damontecres.wholphin"
+        // Jellyeye: own app id so it installs alongside Wholphin
+        applicationId = "uk.eyerex.jellyeye"
         minSdk = libs.versions.minSdk.getInt()
         targetSdk = libs.versions.targetSdk.getInt()
-        versionCode = gitTags.trim().lines().size
+        // Jellyeye: build number comes from GitHub Actions
+        val jellyeyeBuild = System.getenv("JELLYEYE_BUILD")?.toIntOrNull()
+        versionCode = jellyeyeBuild ?: maxOf(1, gitTags.trim().lines().size)
+        // keep Wholphin's own version number: the app uses it to run its settings upgrades
         versionName = gitDescribe.trim().removePrefix("v").ifBlank { "0.0.0" }
         testInstrumentationRunner = "com.github.damontecres.wholphin.test.WholphinTestRunner"
 
@@ -83,6 +87,15 @@ configure<ApplicationExtension> {
     }
 
     signingConfigs {
+        // Jellyeye: one fixed key so every new build installs over the last one (keeps your login)
+        create("jellyeye") {
+            storeFile = file("jellyeye.keystore")
+            storePassword = "jellyeye"
+            keyAlias = "jellyeye"
+            keyPassword = "jellyeye"
+            enableV1Signing = true
+            enableV2Signing = true
+        }
         if (shouldSign.get()) {
             create("ci") {
                 file("ci.keystore").writeBytes(
@@ -120,6 +133,8 @@ configure<ApplicationExtension> {
                     if (signingConfigName != null) {
                         signingConfig = signingConfigs.getByName(signingConfigName)
                     }
+                } else {
+                    signingConfig = signingConfigs.getByName("jellyeye")
                 }
             }
         }
@@ -147,7 +162,8 @@ configure<ApplicationExtension> {
             dimension = "version"
             isDefault = true
             manifestPlaceholders += mapOf(featureLeanback to false)
-            setFeatureFlag(featureUpdate, true)
+            // Jellyeye: Wholphin's in-app updater would offer to replace Jellyeye with Wholphin, so it's off
+            setFeatureFlag(featureUpdate, false)
             setFeatureFlag(featureDiscover, true)
         }
         create("appstore") {
@@ -221,7 +237,7 @@ androidComponents {
                         .getFilter(FilterConfiguration.FilterType.ABI)
                         .let { if (it != null) "-${it.identifier}" else "" }
                 val outputFileName =
-                    "Wholphin-${variant.flavorName}-${variant.buildType}-${output.versionName.get()}-${output.versionCode.get()}$abi.apk"
+                    "Jellyeye-${variant.buildType}-${output.versionCode.get()}$abi.apk"
                 output.outputFileName = outputFileName
             }
     }
