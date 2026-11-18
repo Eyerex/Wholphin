@@ -581,8 +581,27 @@ private fun WideGrid(
                                     .clip(RoundedCornerShape(14.dp))
                                     .background(Color(0xFF2B2E33)),
                             ) {
-                                val url = remember(item.id) { imageUrls.getItemImageUrl(item, ImageType.THUMB, fillWidth = 480) }
-                                AsyncImage(model = url, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                // try the episode's own picture first, then the show's artwork, so nothing is left blank
+                                val candidates =
+                                    remember(item.id) {
+                                        val types =
+                                            if (item.type == BaseItemKind.EPISODE) {
+                                                listOf(ImageType.PRIMARY, ImageType.THUMB, ImageType.BACKDROP)
+                                            } else {
+                                                listOf(ImageType.THUMB, ImageType.BACKDROP, ImageType.PRIMARY)
+                                            }
+                                        types.mapNotNull { imageUrls.getItemImageUrl(item, it, fillWidth = 480) }.distinct()
+                                    }
+                                var attempt by remember(item.id) { mutableIntStateOf(0) }
+                                candidates.getOrNull(attempt)?.let { url ->
+                                    AsyncImage(
+                                        model = url,
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Crop,
+                                        onError = { attempt++ },
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                                }
                                 val pct = (item.data.userData?.playedPercentage ?: 0.0).toFloat()
                                 if (pct > 0f) {
                                     Box(
