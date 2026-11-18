@@ -70,7 +70,8 @@ fun DestinationContent(
     }
     when (destination) {
         is Destination.Home -> {
-            HomePage(
+            // Jellyeye: our own home screen (spotlight, pick up, recommendations, seasonal panel)
+            com.github.damontecres.wholphin.ui.jellyeye.JellyeyeHome(
                 preferences = preferences,
                 modifier = modifier,
             )
