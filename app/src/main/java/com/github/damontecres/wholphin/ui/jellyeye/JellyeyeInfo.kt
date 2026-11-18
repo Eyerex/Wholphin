@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -31,11 +32,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -53,6 +56,7 @@ import com.github.damontecres.wholphin.preferences.UserPreferences
 import com.github.damontecres.wholphin.ui.LocalImageUrlService
 import com.github.damontecres.wholphin.ui.tryRequestFocus
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.BaseItemPerson
 import org.jellyfin.sdk.model.api.ImageType
@@ -106,14 +110,22 @@ fun JellyeyeInfo(
             delay(150)
             firstFocus.tryRequestFocus()
         }
+        val listState = rememberLazyListState()
+        val scope = rememberCoroutineScope()
+        // anything focused in the header brings the whole header (the top of the page) back into view
+        val showTop =
+            Modifier.onFocusChanged {
+                if (it.hasFocus) scope.launch { listState.animateScrollToItem(0) }
+            }
         CompositionLocalProvider(LocalBringIntoViewSpec provides JellyeyeScrollSpec) {
             LazyColumn(
+                state = listState,
                 contentPadding = PaddingValues(start = 36.dp, end = 36.dp, top = 16.dp, bottom = 48.dp),
                 verticalArrangement = Arrangement.spacedBy(18.dp),
                 modifier = Modifier.fillMaxSize(),
             ) {
                 if (item.type == BaseItemKind.PERSON) {
-                    item(key = "person") { PersonHeader(item, state, firstFocus, viewModel) }
+                    item(key = "person") { Box(showTop) { PersonHeader(item, state, firstFocus, viewModel) } }
                     if (state.films.isNotEmpty()) {
                         item(key = "films") {
                             SectionTile("Films in your library · ${state.films.size}") {
@@ -129,7 +141,7 @@ fun JellyeyeInfo(
                         }
                     }
                 } else {
-                    item(key = "hero") { InfoHeader(item, state, now, firstFocus, viewModel) }
+                    item(key = "hero") { Box(showTop) { InfoHeader(item, state, now, firstFocus, viewModel) } }
                     item(key = "about") { AboutRow(item) }
                     if (item.type == BaseItemKind.SERIES && state.seasons.isNotEmpty()) {
                         item(key = "episodes") { Episodes(state, now, viewModel) }
