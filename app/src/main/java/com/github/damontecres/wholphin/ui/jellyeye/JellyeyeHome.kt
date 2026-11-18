@@ -1,6 +1,14 @@
 package com.github.damontecres.wholphin.ui.jellyeye
 
 import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.BringIntoViewSpec
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.focus.onFocusChanged
+import kotlinx.coroutines.launch
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -71,6 +79,29 @@ import org.jellyfin.sdk.model.api.ImageType
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+
+/**
+ * How the page scrolls when the remote moves: as little as possible, but always keeping what you've
+ * selected fully on screen with a little room around it. (Android TV's default moves the selected
+ * thing to about a third of the way down, which pushed the top of the spotlight off the screen.)
+ */
+@OptIn(ExperimentalFoundationApi::class)
+private object JellyeyeScrollSpec : BringIntoViewSpec {
+    override fun calculateScrollDistance(
+        offset: Float,
+        size: Float,
+        containerSize: Float,
+    ): Float {
+        val margin = containerSize * 0.10f
+        val above = offset - margin
+        val below = offset + size + margin - containerSize
+        return when {
+            above < 0f -> above
+            below > 0f -> minOf(below, above)
+            else -> 0f
+        }
+    }
+}
 
 /** Jellyeye colours: the same palette as the web design. */
 object JE {
@@ -224,6 +255,7 @@ private fun SectionTile(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun JellyeyeHome(
     preferences: UserPreferences,
@@ -273,7 +305,11 @@ fun JellyeyeHome(
                 playFocus.tryRequestFocus()
             }
         }
+        val listState = rememberLazyListState()
+        val scope = rememberCoroutineScope()
+        CompositionLocalProvider(LocalBringIntoViewSpec provides JellyeyeScrollSpec) {
         LazyColumn(
+            state = listState,
             contentPadding = PaddingValues(start = 28.dp, end = 28.dp, top = 16.dp, bottom = 48.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.fillMaxSize(),
@@ -281,6 +317,11 @@ fun JellyeyeHome(
             if (state.spotlight.isNotEmpty()) {
                 item(key = "spotlight") {
                     Spotlight(
+                        // whenever anything in the spotlight is selected, show the whole card from the top
+                        modifier =
+                            Modifier.onFocusChanged {
+                                if (it.hasFocus) scope.launch { listState.animateScrollToItem(0) }
+                            },
                         items = state.spotlight,
                         now = now,
                         playFocus = playFocus,
@@ -317,6 +358,7 @@ fun JellyeyeHome(
                 }
             }
         }
+        }
     }
 }
 
@@ -327,6 +369,7 @@ private const val SLIDE_MS = 8_000
 
 @Composable
 private fun Spotlight(
+    modifier: Modifier = Modifier,
     items: List<SpotlightItem>,
     now: LocalDateTime,
     playFocus: FocusRequester,
@@ -354,7 +397,7 @@ private fun Spotlight(
 
     Box(
         modifier =
-            Modifier
+            modifier
                 .fillMaxWidth()
                 .height(372.dp)
                 .clip(RoundedCornerShape(24.dp))
