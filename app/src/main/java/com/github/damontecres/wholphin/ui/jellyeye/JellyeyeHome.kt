@@ -86,7 +86,7 @@ import java.time.temporal.ChronoUnit
  * thing to about a third of the way down, which pushed the top of the spotlight off the screen.)
  */
 @OptIn(ExperimentalFoundationApi::class)
-private object JellyeyeScrollSpec : BringIntoViewSpec {
+internal object JellyeyeScrollSpec : BringIntoViewSpec {
     override fun calculateScrollDistance(
         offset: Float,
         size: Float,
@@ -118,16 +118,16 @@ object JE {
     val ghost = Color(0x21FFFFFF)
 }
 
-private val clockFormat = DateTimeFormatter.ofPattern("HH:mm")
+internal val clockFormat = DateTimeFormatter.ofPattern("HH:mm")
 
-private fun minutesOf(ticks: Long?): Long = (ticks ?: 0L) / 600_000_000L
+internal fun minutesOf(ticks: Long?): Long = (ticks ?: 0L) / 600_000_000L
 
-private fun finishAt(
+internal fun finishAt(
     now: LocalDateTime,
     minutes: Long,
 ): String = now.plusMinutes(minutes).format(clockFormat)
 
-private fun lengthText(item: BaseItem): String? =
+internal fun lengthText(item: BaseItem): String? =
     if (item.type == BaseItemKind.SERIES) {
         item.data.childCount?.let { if (it == 1) "1 season" else "$it seasons" }
     } else {
@@ -165,7 +165,7 @@ fun JeFocusable(
 }
 
 @Composable
-private fun PillButton(
+internal fun PillButton(
     text: String,
     onClick: () -> Unit,
     primary: Boolean = false,
@@ -187,7 +187,7 @@ private fun PillButton(
 }
 
 @Composable
-private fun Chip(
+internal fun Chip(
     text: String,
     gold: Boolean = false,
 ) {
@@ -206,7 +206,7 @@ private fun Chip(
 }
 
 @Composable
-private fun Meter(
+internal fun Meter(
     label: String,
     value: String,
     fraction: Float,
@@ -235,7 +235,7 @@ private fun Meter(
 }
 
 @Composable
-private fun SectionTile(
+internal fun SectionTile(
     title: String,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
@@ -651,15 +651,21 @@ private fun WideGrid(
    Poster grids: full rows that move top to bottom, rating bottom-right
    ------------------------------------------------------------------ */
 @Composable
-private fun PosterGrid(
+internal fun PosterGrid(
     items: List<BaseItem>,
     rows: Int,
     onClick: (BaseItem) -> Unit,
     columns: Int = 8,
+    fullRowsOnly: Boolean = true,
 ) {
     val imageUrls = LocalImageUrlService.current
-    // only complete rows, like the web version
-    val count = (items.size.coerceAtMost(columns * rows) / columns * columns).takeIf { it > 0 } ?: items.size.coerceAtMost(columns)
+    // only complete rows, like the web version (unless every title should be shown, e.g. an actor's films)
+    val count =
+        if (!fullRowsOnly) {
+            items.size.coerceAtMost(columns * rows)
+        } else {
+            (items.size.coerceAtMost(columns * rows) / columns * columns).takeIf { it > 0 } ?: items.size.coerceAtMost(columns)
+        }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         items.take(count).chunked(columns).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {

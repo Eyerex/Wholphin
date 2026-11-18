@@ -144,21 +144,29 @@ fun DestinationContent(
             )
         }
 
+        is Destination.OriginalDetails -> {
+            val original = Destination.MediaItem(destination.itemId, destination.type)
+            when (destination.type) {
+                BaseItemKind.SERIES -> SeriesDetails(preferences, original, modifier)
+                BaseItemKind.PERSON -> {
+                    LaunchedEffect(Unit) { onClearBackdrop.invoke() }
+                    PersonPage(preferences, original, modifier)
+                }
+                else -> MovieDetails(preferences, original, modifier)
+            }
+        }
+
         is Destination.MediaItem -> {
             when (destination.type) {
-                BaseItemKind.SERIES -> {
-                    SeriesDetails(
-                        preferences,
-                        destination,
-                        modifier,
-                    )
-                }
-
-                BaseItemKind.MOVIE -> {
-                    MovieDetails(
-                        preferences,
-                        destination,
-                        modifier,
+                BaseItemKind.SERIES,
+                BaseItemKind.MOVIE,
+                BaseItemKind.PERSON,
+                -> {
+                    LaunchedEffect(Unit) { onClearBackdrop.invoke() }
+                    com.github.damontecres.wholphin.ui.jellyeye.JellyeyeInfo(
+                        itemId = destination.itemId,
+                        preferences = preferences,
+                        modifier = modifier,
                     )
                 }
 
@@ -232,15 +240,6 @@ fun DestinationContent(
                         usePostersOverride = null,
                         recursiveOverride = true,
                         modifier = modifier,
-                    )
-                }
-
-                BaseItemKind.PERSON -> {
-                    LaunchedEffect(Unit) { onClearBackdrop.invoke() }
-                    PersonPage(
-                        preferences,
-                        destination,
-                        modifier,
                     )
                 }
 
