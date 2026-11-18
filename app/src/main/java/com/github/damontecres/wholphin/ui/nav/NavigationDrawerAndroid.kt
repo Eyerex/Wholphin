@@ -25,6 +25,12 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.zIndex
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -73,7 +79,9 @@ fun ModalNavigationDrawer(
         DrawerSheet(
             modifier =
                 Modifier
-                    .align(Alignment.CenterStart),
+                    .align(Alignment.CenterStart)
+                    // Jellyeye: draw the menu above the page, since the home screen now runs under it
+                    .zIndex(1f),
             drawerState = drawerState,
             content = drawerContent,
         )
@@ -122,8 +130,17 @@ private fun DrawerSheet(
                 }
             }.focusGroup()
 
-    Box(modifier = internalModifier) {
-        NavigationDrawerScopeImpl(drawerState.currentValue == DrawerValue.Open).apply {
+    // Jellyeye: the menu hides itself until the remote moves into it (Left at the edge, or Back on
+    // the home screen), then appears as a dark glass panel over the page.
+    val isOpen = drawerState.currentValue == DrawerValue.Open
+    val sheetAlpha by animateFloatAsState(if (isOpen) 1f else 0f, label = "drawerAlpha")
+    Box(
+        modifier =
+            internalModifier
+                .graphicsLayer { alpha = sheetAlpha }
+                .background(Color(0xF2111214), RoundedCornerShape(topEnd = 22.dp, bottomEnd = 22.dp)),
+    ) {
+        NavigationDrawerScopeImpl(isOpen).apply {
             content(drawerState.currentValue)
         }
     }

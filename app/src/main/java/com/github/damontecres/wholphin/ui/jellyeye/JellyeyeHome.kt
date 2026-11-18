@@ -310,7 +310,7 @@ fun JellyeyeHome(
         CompositionLocalProvider(LocalBringIntoViewSpec provides JellyeyeScrollSpec) {
         LazyColumn(
             state = listState,
-            contentPadding = PaddingValues(start = 28.dp, end = 28.dp, top = 16.dp, bottom = 48.dp),
+            contentPadding = PaddingValues(start = 72.dp, end = 32.dp, top = 16.dp, bottom = 48.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.fillMaxSize(),
         ) {

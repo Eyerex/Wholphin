@@ -555,7 +555,14 @@ fun NavDrawer(
                         .fillMaxSize()
                         .offset {
                             offset
-                        }.padding(start = closedDrawerWidth + 8.dp, end = 16.dp),
+                        }.then(
+                            // Jellyeye: the home screen runs edge to edge and keeps its own margin
+                            if (destination is Destination.Home) {
+                                Modifier
+                            } else {
+                                Modifier.padding(start = closedDrawerWidth + 8.dp, end = 16.dp)
+                            },
+                        ),
             )
             if (preferences.appPreferences.interfacePreferences.showClock) {
                 TimeDisplay()
@@ -579,6 +586,11 @@ fun NavigationDrawerScope.ProfileIcon(
         modifier = modifier,
         selected = false,
         onClick = onClick,
+        colors =
+            NavigationDrawerItemDefaults.colors(
+                focusedContainerColor = Color(0x33E5A00D),
+                focusedContentColor = Color.White,
+            ),
         leadingContent = {
             UserIconCardImage(
                 id = user.id,
@@ -620,6 +632,11 @@ fun NavigationDrawerScope.IconNavItem(
         modifier = modifier,
         selected = false,
         onClick = onClick,
+        colors =
+            NavigationDrawerItemDefaults.colors(
+                focusedContainerColor = Color(0x33E5A00D),
+                focusedContentColor = Color.White,
+            ),
         leadingContent = {
             val color = navItemColor(selected, focused, drawerOpen)
             Icon(
@@ -698,6 +715,8 @@ fun NavigationDrawerScope.NavItem(
         colors =
             NavigationDrawerItemDefaults.colors(
                 containerColor = containerColor,
+                focusedContainerColor = Color(0x33E5A00D),
+                focusedContentColor = Color.White,
             ),
         leadingContent = {
             val color = navItemColor(selected, focused, drawerOpen)
@@ -762,11 +781,17 @@ fun navItemColor(
     } else {
         val alpha =
             when {
+                theme == AppThemeColors.ORANGE -> 1f
                 drawerOpen -> .85f
                 selected && !drawerOpen -> .5f
                 else -> .2f
             }
         return when {
+            // Jellyeye palette
+            theme == AppThemeColors.ORANGE && selected -> Color(0xFFE5A00D)
+            theme == AppThemeColors.ORANGE && focused -> Color.White
+            theme == AppThemeColors.ORANGE -> Color(0xFF9A9FA5)
+
             selected && focused -> {
                 when (theme) {
                     AppThemeColors.UNRECOGNIZED,
