@@ -1,7 +1,6 @@
 package com.github.damontecres.wholphin.ui.jellyeye
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.ExperimentalLayoutApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
@@ -403,7 +402,6 @@ private fun Label(text: String) {
 /* ------------------------------------------------------------------
    Episodes: season pills, then a list going down the page
    ------------------------------------------------------------------ */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun Episodes(
     state: JellyeyeInfoState,
