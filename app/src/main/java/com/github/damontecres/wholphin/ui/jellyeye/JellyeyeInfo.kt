@@ -182,7 +182,7 @@ fun JellyeyeInfo(
                             }
                         }
                     }
-                    item(key = "about") { AboutRow(item) }
+                    if (hasAbout(item)) item(key = "about") { AboutRow(item) }
                     if (item.type == BaseItemKind.BOX_SET && state.films.isNotEmpty()) {
                         item(key = "collection") {
                             SectionTile("In this collection · ${state.films.size}") {
@@ -384,100 +384,120 @@ private fun clockText(ms: Long): String {
 /* ------------------------------------------------------------------
    About: tagline and summary on the left; ratings and details on the right
    ------------------------------------------------------------------ */
+/** The facts for the details panel; only the ones the title actually has. */
+private fun detailFacts(item: BaseItem): List<Pair<String, String>> {
+    val isSeries = item.type == BaseItemKind.SERIES
+    val people = item.data.people.orEmpty()
+    val streams = item.data.mediaStreams.orEmpty()
+    val video = streams.firstOrNull { it.type == MediaStreamType.VIDEO }
+    val audio = streams.firstOrNull { it.type == MediaStreamType.AUDIO && it.isDefault } ?: streams.firstOrNull { it.type == MediaStreamType.AUDIO }
+    val subs = streams.count { it.type == MediaStreamType.SUBTITLE }
+    val res =
+        video?.let { v ->
+            val w = v.width ?: 0
+            val h = v.height ?: 0
+            val size =
+                when {
+                    w >= 3800 || h >= 2000 -> "4K"
+                    h >= 1000 -> "1080p"
+                    h >= 700 -> "720p"
+                    else -> "SD"
+                }
+            val range = v.videoRangeType.takeIf { it != VideoRangeType.SDR && it != VideoRangeType.UNKNOWN }?.name
+            listOfNotNull(size, v.codec?.uppercase(), range).joinToString(" ")
+        }
+    val aud = audio?.let { a -> listOfNotNull(a.codec?.uppercase(), a.channelLayout ?: a.channels?.let { "${it}ch" }).joinToString(" ") }
+    return listOfNotNull(
+        people.filter { it.type == PersonKind.DIRECTOR }.take(2).joinToString(", ") { it.name ?: "" }.takeIf { it.isNotBlank() }?.let { "Director" to it },
+        people.filter { it.type == PersonKind.WRITER }.take(2).joinToString(", ") { it.name ?: "" }.takeIf { it.isNotBlank() }?.let { "Writer" to it },
+        item.data.studios.orEmpty().take(2).joinToString(", ") { it.name ?: "" }.takeIf { it.isNotBlank() }?.let { (if (isSeries) "Network" else "Studio") to it },
+        item.data.premiereDate?.let { (if (isSeries) "First aired" else "Released") to it.toLocalDate().format(longDate) },
+        res?.takeIf { it.isNotBlank() }?.let { "Video" to it },
+        aud?.takeIf { it.isNotBlank() }?.let { "Audio" to it },
+        subs.takeIf { it > 0 }?.let { "Subtitles" to (if (it == 1) "1 track" else "$it tracks") },
+    )
+}
+
+private fun hasRatings(item: BaseItem): Boolean =
+    item.data.communityRating != null ||
+        item.data.criticRating != null ||
+        (item.type != BaseItemKind.SERIES && (item.data.userData?.playedPercentage ?: 0.0) > 0.0)
+
+/** Whether the ratings & details panel has anything worth showing. Collections never do: their dates, studio and progress belong to single films. */
+private fun showFactsPanel(item: BaseItem): Boolean = item.type != BaseItemKind.BOX_SET && (hasRatings(item) || detailFacts(item).isNotEmpty())
+
+private fun showSummary(item: BaseItem): Boolean =
+    !item.data.overview.isNullOrBlank() || !item.data.taglines.isNullOrEmpty() || !item.data.genres.isNullOrEmpty()
+
+/** True when the about section would show anything at all (otherwise it's left out, gap and all). */
+private fun hasAbout(item: BaseItem): Boolean = showSummary(item) || showFactsPanel(item)
+
 @Composable
 private fun AboutRow(item: BaseItem) {
     val isSeries = item.type == BaseItemKind.SERIES
     Column(verticalArrangement = Arrangement.spacedBy(JeLayout.panelGap)) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            item.data.taglines?.firstOrNull()?.let {
-                Text(it, color = JE.accent2, fontSize = 15.sp, fontStyle = FontStyle.Italic)
-            }
-            Text(
-                item.data.overview ?: "",
-                color = Color(0xFFDFE2E6),
-                fontSize = 14.sp,
-                lineHeight = 22.sp,
-            )
-            val genres = item.data.genres.orEmpty()
-            if (genres.isNotEmpty()) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    genres.take(5).forEach {
-                        Text(
-                            it,
-                            color = JE.soft,
-                            fontSize = 11.sp,
-                            modifier =
-                                Modifier
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .background(Color(0x12FFFFFF))
-                                    .padding(horizontal = 9.dp, vertical = 3.dp),
-                        )
+        if (showSummary(item)) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                item.data.taglines?.firstOrNull()?.takeIf { it.isNotBlank() }?.let {
+                    Text(it, color = JE.accent2, fontSize = 15.sp, fontStyle = FontStyle.Italic)
+                }
+                item.data.overview?.takeIf { it.isNotBlank() }?.let {
+                    Text(it, color = Color(0xFFDFE2E6), fontSize = 14.sp, lineHeight = 22.sp)
+                }
+                val genres = item.data.genres.orEmpty()
+                if (genres.isNotEmpty()) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        genres.take(6).forEach {
+                            Text(
+                                it,
+                                color = JE.soft,
+                                fontSize = 11.sp,
+                                modifier =
+                                    Modifier
+                                        .clip(RoundedCornerShape(20.dp))
+                                        .background(Color(0x12FFFFFF))
+                                        .padding(horizontal = 9.dp, vertical = 3.dp),
+                            )
+                        }
                     }
                 }
             }
         }
-        // ratings on the left, details laid out across the rest of the width
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .background(JE.tile)
-                .border(1.dp, JE.line, RoundedCornerShape(20.dp))
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(28.dp),
-        ) {
-            val community = item.data.communityRating
-            val critic = item.data.criticRating
-            val progress = item.data.userData?.playedPercentage
-            if (community != null || critic != null || (progress ?: 0.0) > 0.0) {
-                Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                    Label("Ratings")
-                    community?.let { Meter("Audience", "★ ${"%.1f".format(it)} / 10", it / 10f, JE.accent) }
-                    critic?.let { Meter("Critics", "${it.toInt()}%", it / 100f, JE.critic) }
-                    if (!isSeries && (progress ?: 0.0) > 0.0) Meter("Your progress", "${progress!!.toInt()}%", (progress / 100).toFloat(), Color(0xFF4ADE80))
+        if (showFactsPanel(item)) {
+            // ratings on the left, details laid out across the rest of the width
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(JE.tile)
+                    .border(1.dp, JE.line, RoundedCornerShape(20.dp))
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(28.dp),
+            ) {
+                if (hasRatings(item)) {
+                    val community = item.data.communityRating
+                    val critic = item.data.criticRating
+                    val progress = item.data.userData?.playedPercentage
+                    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                        Label("Ratings")
+                        community?.let { Meter("Audience", "★ ${"%.1f".format(it)} / 10", it / 10f, JE.accent) }
+                        critic?.let { Meter("Critics", "${it.toInt()}%", it / 100f, JE.critic) }
+                        if (!isSeries && (progress ?: 0.0) > 0.0) Meter("Your progress", "${progress!!.toInt()}%", (progress / 100).toFloat(), Color(0xFF4ADE80))
+                    }
                 }
-            }
-            val people = item.data.people.orEmpty()
-            val streams = item.data.mediaStreams.orEmpty()
-            val video = streams.firstOrNull { it.type == MediaStreamType.VIDEO }
-            val audio = streams.firstOrNull { it.type == MediaStreamType.AUDIO && it.isDefault } ?: streams.firstOrNull { it.type == MediaStreamType.AUDIO }
-            val subs = streams.count { it.type == MediaStreamType.SUBTITLE }
-            val res =
-                video?.let { v ->
-                    val w = v.width ?: 0
-                    val h = v.height ?: 0
-                    val size =
-                        when {
-                            w >= 3800 || h >= 2000 -> "4K"
-                            h >= 1000 -> "1080p"
-                            h >= 700 -> "720p"
-                            else -> "SD"
-                        }
-                    val range = v.videoRangeType.takeIf { it != VideoRangeType.SDR && it != VideoRangeType.UNKNOWN }?.name
-                    listOfNotNull(size, v.codec?.uppercase(), range).joinToString(" ")
-                }
-            val aud = audio?.let { a -> listOfNotNull(a.codec?.uppercase(), a.channelLayout ?: a.channels?.let { "${it}ch" }).joinToString(" ") }
-            val facts =
-                listOfNotNull(
-                    people.filter { it.type == PersonKind.DIRECTOR }.take(2).joinToString(", ") { it.name ?: "" }.takeIf { it.isNotBlank() }?.let { "Director" to it },
-                    people.filter { it.type == PersonKind.WRITER }.take(2).joinToString(", ") { it.name ?: "" }.takeIf { it.isNotBlank() }?.let { "Writer" to it },
-                    item.data.studios.orEmpty().take(2).joinToString(", ") { it.name ?: "" }.takeIf { it.isNotBlank() }?.let { (if (isSeries) "Network" else "Studio") to it },
-                    item.data.premiereDate?.let { (if (isSeries) "First aired" else "Released") to it.toLocalDate().format(longDate) },
-                    res?.takeIf { it.isNotBlank() }?.let { "Video" to it },
-                    aud?.takeIf { it.isNotBlank() }?.let { "Audio" to it },
-                    subs.takeIf { it > 0 }?.let { "Subtitles" to (if (it == 1) "1 track" else "$it tracks") },
-                )
-            if (facts.isNotEmpty()) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                    Label("Details")
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        facts.forEach { (k, v) ->
-                            Column(Modifier.width(170.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text(k, color = JE.dim, fontSize = 11.sp)
-                                Text(v, color = JE.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                val facts = detailFacts(item)
+                if (facts.isNotEmpty()) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                        Label("Details")
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            facts.forEach { (k, v) ->
+                                Column(Modifier.width(200.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text(k, color = JE.dim, fontSize = 11.sp)
+                                    Text(v, color = JE.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                }
                             }
                         }
                     }
