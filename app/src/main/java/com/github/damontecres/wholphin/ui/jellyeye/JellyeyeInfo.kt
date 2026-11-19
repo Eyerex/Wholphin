@@ -747,9 +747,11 @@ private fun CollectionSpotlight(
         onInfo = viewModel::open,
         badge = { _, _ -> "Collection · ${collection.name ?: ""} · ${all.size} ${if (all.size == 1) "title" else "titles"}" },
         extraButtons = {
+            // the whole collection: every film back to back in release order, or shuffled
+            PillButton("▶▶  Play all", onClick = { viewModel.playCollection(shuffle = false) })
+            PillButton("⇄  Shuffle", onClick = { viewModel.playCollection(shuffle = true) })
             PillButton(if (ud?.isFavorite == true) "♥  Favourite" else "♡  Favourite", onClick = viewModel::toggleFavorite)
             PillButton(if (ud?.played == true) "✓  Watched" else "Mark watched", onClick = viewModel::toggleWatched)
-            PillButton("More options", onClick = viewModel::openOriginal)
         },
     )
 }

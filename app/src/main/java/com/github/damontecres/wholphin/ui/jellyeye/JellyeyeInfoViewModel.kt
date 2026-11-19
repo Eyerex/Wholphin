@@ -6,6 +6,7 @@ import com.github.damontecres.wholphin.data.ServerRepository
 import com.github.damontecres.wholphin.data.model.BaseItem
 import com.github.damontecres.wholphin.services.FavoriteWatchManager
 import com.github.damontecres.wholphin.services.NavigationManager
+import com.github.damontecres.wholphin.ui.data.SortAndDirection
 import com.github.damontecres.wholphin.ui.detail.series.SeasonEpisodeIds
 import com.github.damontecres.wholphin.ui.launchIO
 import com.github.damontecres.wholphin.ui.nav.Destination
@@ -249,6 +250,20 @@ class JellyeyeInfoViewModel
             id: UUID,
         ) {
             navigationManager.navigateTo(Destination.MediaItem(id, BaseItemKind.PERSON))
+        }
+
+        /** A collection played start to finish in release order, or shuffled. */
+        fun playCollection(shuffle: Boolean) {
+            val item = _state.value.item ?: return
+            navigationManager.navigateTo(
+                Destination.PlaybackList(
+                    itemId = item.id,
+                    startIndex = 0,
+                    shuffle = shuffle,
+                    recursive = true,
+                    sortAndDirection = SortAndDirection(ItemSortBy.PREMIERE_DATE, SortOrder.ASCENDING),
+                ),
+            )
         }
 
         /** Wholphin's original details page, for its extra options. */
