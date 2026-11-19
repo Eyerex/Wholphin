@@ -215,7 +215,7 @@ internal fun PillButton(
         Text(
             text = text,
             color = if (primary) JE.onAccent else Color.White,
-            fontSize = 15.sp,
+            fontSize = 13.sp,
             fontWeight = if (primary) FontWeight.ExtraBold else FontWeight.SemiBold,
             maxLines = 1,
             softWrap = false,
@@ -223,7 +223,7 @@ internal fun PillButton(
                 Modifier
                     .clip(RoundedCornerShape(30.dp))
                     .background(if (primary) JE.accent else JE.ghost)
-                    .padding(horizontal = 22.dp, vertical = 10.dp),
+                    .padding(horizontal = 15.dp, vertical = 7.dp),
         )
     }
 }
@@ -521,11 +521,13 @@ internal fun Spotlight(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+                val runMins = if (item.type == BaseItemKind.SERIES) 0L else minutesOf(item.data.runTimeTicks)
                 val meta =
                     listOfNotNull(
                         item.data.productionYear?.toString(),
                         lengthText(item),
                         item.data.genres?.take(2)?.joinToString(" · ")?.takeIf { it.isNotBlank() },
+                        if (runMins > 0) "ends at ${finishAt(now, runMins)}" else null,
                     )
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(meta.joinToString("  ·  "), color = JE.soft, fontSize = 13.sp)
@@ -559,24 +561,13 @@ internal fun Spotlight(
                     modifier = Modifier.widthIn(max = 560.dp).weight(1f, fill = false),
                 )
             FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
                 itemVerticalAlignment = Alignment.CenterVertically,
             ) {
                 PillButton("▶  Play", onClick = { onPlay(item) }, primary = true, focusRequester = playFocus)
                 PillButton("ⓘ  More info", onClick = { onInfo(item) })
                 extraButtons()
-                val mins =
-                    if (item.type == BaseItemKind.SERIES) 0L else minutesOf(item.data.runTimeTicks)
-                if (mins > 0) {
-                    Text(
-                        "Start now and you finish at ${finishAt(now, mins)}",
-                        color = Color(0xFFB8BCC2),
-                        fontSize = 12.sp,
-                        maxLines = 1,
-                        modifier = Modifier.padding(start = 8.dp),
-                    )
-                }
             }
             }
 
