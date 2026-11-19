@@ -1,5 +1,15 @@
 package com.github.damontecres.wholphin.ui.jellyeye
 
+import org.jellyfin.sdk.model.serializer.toUUIDOrNull
+import androidx.compose.ui.res.stringResource
+import com.github.damontecres.wholphin.ui.detail.PlaylistDialog
+import com.github.damontecres.wholphin.ui.data.ItemDetailsDialogInfo
+import com.github.damontecres.wholphin.ui.data.ItemDetailsDialog
+import com.github.damontecres.wholphin.ui.data.AddPlaylistViewModel
+import com.github.damontecres.wholphin.ui.components.ContextMenuDialog
+import com.github.damontecres.wholphin.ui.components.ContextMenuActions
+import com.github.damontecres.wholphin.ui.components.ContextMenu
+import com.github.damontecres.wholphin.R
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -89,6 +99,7 @@ fun JellyeyeInfo(
 ) {
     LaunchedEffect(itemId) { viewModel.load(itemId, seasonEpisode) }
     val state by viewModel.state.collectAsState()
+    var showMenu by remember { mutableStateOf(false) }
     var now by remember { mutableStateOf(LocalDateTime.now()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -98,6 +109,11 @@ fun JellyeyeInfo(
     }
 
     Box(modifier = modifier.fillMaxSize().background(JE.bg)) {
+        state.item?.let { current ->
+            if (showMenu) {
+                JellyeyeOptions(current, state, viewModel, onDismiss = { showMenu = false })
+            }
+        }
         val item = state.item
         if (item == null) {
             Text(
@@ -162,7 +178,7 @@ fun JellyeyeInfo(
                             if (item.type == BaseItemKind.BOX_SET) {
                                 CollectionSpotlight(item, state, now, firstFocus, viewModel)
                             } else {
-                                InfoHeader(item, state, now, firstFocus, viewModel)
+                                InfoHeader(item, state, now, firstFocus, viewModel, onMore = { showMenu = true })
                             }
                         }
                     }
@@ -209,6 +225,7 @@ private fun InfoHeader(
     now: LocalDateTime,
     firstFocus: FocusRequester,
     viewModel: JellyeyeInfoViewModel,
+    onMore: () -> Unit,
 ) {
     val imageUrls = LocalImageUrlService.current
     val isSeries = item.type == BaseItemKind.SERIES
@@ -328,7 +345,7 @@ private fun InfoHeader(
                 }
                 PillButton(if (ud?.isFavorite == true) "♥  Favourite" else "♡  Favourite", onClick = viewModel::toggleFavorite)
                 PillButton(if (ud?.played == true) "✓  Watched" else "Mark watched", onClick = viewModel::toggleWatched)
-                PillButton("More options", onClick = viewModel::openOriginal)
+                PillButton("•••  More", onClick = onMore)
             }
             val what =
                 when {
@@ -674,7 +691,6 @@ private fun PersonHeader(
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     val fav = person.data.userData?.isFavorite == true
                     PillButton(if (fav) "♥  Favourite" else "♡  Favourite", onClick = viewModel::toggleFavorite, focusRequester = firstFocus)
-                    PillButton("More options", onClick = viewModel::openOriginal)
                 }
             }
         }
@@ -764,5 +780,98 @@ private fun Stat(
     Column {
         Text("$value", color = JE.text, fontSize = 24.sp, fontWeight = FontWeight.Bold)
         Text(label, color = JE.dim, fontSize = 11.sp)
+    }
+}
+
+/* ------------------------------------------------------------------
+   "More": Wholphin's own options pop-up (audio, subtitles, version, play with, playlists, media info, delete…)
+   ------------------------------------------------------------------ */
+@Composable
+private fun JellyeyeOptions(
+    item: BaseItem,
+    state: JellyeyeInfoState,
+    viewModel: JellyeyeInfoViewModel,
+    onDismiss: () -> Unit,
+    playlistViewModel: AddPlaylistViewModel = hiltViewModel(),
+) {
+    var details by remember { mutableStateOf<ItemDetailsDialogInfo?>(null) }
+    var playlistFor by remember { mutableStateOf<UUID?>(null) }
+    var menuOpen by remember { mutableStateOf(true) }
+    val playlistState by playlistViewModel.playlistState.collectAsState()
+    val actions =
+        remember(item.id) {
+            ContextMenuActions(
+                navigateTo = viewModel::navigateTo,
+                onShowOverview = { details = ItemDetailsDialogInfo(it) },
+                onClickWatch = viewModel::setWatched,
+                onClickFavorite = viewModel::setFavorite,
+                onClickAddPlaylist = { id ->
+                    playlistViewModel.loadPlaylists()
+                    playlistFor = id
+                },
+                onSendMediaInfo = { viewModel.sendMediaReport(it) },
+                onDeleteItem = viewModel::deleteThis,
+                onChooseVersion = { i, source -> source.id?.toUUIDOrNull()?.let { viewModel.savePlayVersion(i, it) } },
+                onChooseTracks = { r -> viewModel.saveTrackSelection(r.item, r.itemPlayback, r.trackIndex, r.streamType) },
+                onClearChosenStreams = viewModel::clearChosenStreams,
+                onClickAddToQueue = playlistViewModel::addToQueue,
+            )
+        }
+    if (menuOpen) {
+        ContextMenuDialog(
+            // closing the menu: if a choice opened a follow-up (media info, playlists) that stays up,
+            // otherwise the whole thing closes (see the end of this function)
+            onDismissRequest = { menuOpen = false },
+            contextMenu =
+                ContextMenu.ForBaseItem(
+                    fromLongClick = false,
+                    item = item,
+                    chosenStreams = state.chosenStreams,
+                    showGoTo = false,
+                    showStreamChoices = item.type != BaseItemKind.SERIES,
+                    canDelete = state.canDelete,
+                    canRemoveContinueWatching = false,
+                    canRemoveNextUp = false,
+                    actions = actions,
+                ),
+            getMediaSource = viewModel.streamChoiceService::chooseSource,
+            preferredSubtitleLanguage = viewModel.subtitleLanguage,
+        )
+    }
+    details?.let { info ->
+        ItemDetailsDialog(
+            info = info,
+            showFilePath = viewModel.isAdministrator,
+            onDismissRequest = {
+                details = null
+                onDismiss()
+            },
+        )
+    }
+    playlistFor?.let { id ->
+        PlaylistDialog(
+            title = stringResource(R.string.add_to_playlist),
+            state = playlistState,
+            onDismissRequest = {
+                playlistFor = null
+                onDismiss()
+            },
+            onClick = {
+                playlistViewModel.addToPlaylist(it.id, id)
+                playlistFor = null
+                onDismiss()
+            },
+            createEnabled = true,
+            onCreatePlaylist = {
+                playlistViewModel.createPlaylistAndAddItem(it, id)
+                playlistFor = null
+                onDismiss()
+            },
+            onSearch = playlistViewModel::loadPlaylists,
+            elevation = 3.dp,
+        )
+    }
+    if (!menuOpen && details == null && playlistFor == null) {
+        LaunchedEffect(Unit) { onDismiss() }
     }
 }

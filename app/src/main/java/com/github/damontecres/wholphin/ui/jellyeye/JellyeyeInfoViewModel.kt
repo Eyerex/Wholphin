@@ -1,5 +1,16 @@
 package com.github.damontecres.wholphin.ui.jellyeye
 
+import org.jellyfin.sdk.model.api.MediaStreamType
+import com.github.damontecres.wholphin.services.deleteItem
+import com.github.damontecres.wholphin.services.UserPreferencesService
+import com.github.damontecres.wholphin.services.StreamChoiceService
+import com.github.damontecres.wholphin.services.ServerReportService
+import com.github.damontecres.wholphin.services.MediaManagementService
+import com.github.damontecres.wholphin.data.model.ItemPlayback
+import com.github.damontecres.wholphin.data.ItemPlaybackRepository
+import com.github.damontecres.wholphin.data.ChosenStreams
+import dagger.hilt.android.qualifiers.ApplicationContext
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.damontecres.wholphin.data.ServerRepository
@@ -49,6 +60,9 @@ data class JellyeyeInfoState(
     // people
     val films: List<BaseItem> = emptyList(),
     val shows: List<BaseItem> = emptyList(),
+    // for the options pop-up: saved audio/subtitle/version choices, and whether delete is allowed
+    val chosenStreams: ChosenStreams? = null,
+    val canDelete: Boolean = false,
 )
 
 @HiltViewModel
@@ -59,6 +73,12 @@ class JellyeyeInfoViewModel
         private val api: ApiClient,
         private val serverRepository: ServerRepository,
         private val favoriteWatchManager: FavoriteWatchManager,
+        @param:ApplicationContext private val context: Context,
+        private val itemPlaybackRepository: ItemPlaybackRepository,
+        val streamChoiceService: StreamChoiceService,
+        private val serverReportService: ServerReportService,
+        private val mediaManagementService: MediaManagementService,
+        private val userPreferencesService: UserPreferencesService,
     ) : ViewModel() {
         private val _state = MutableStateFlow(JellyeyeInfoState())
         val state: StateFlow<JellyeyeInfoState> = _state
@@ -82,6 +102,7 @@ class JellyeyeInfoViewModel
                 try {
                     val item = BaseItem(api.libraryApi.getItem(itemId).content, false)
                     _state.update { it.copy(item = item, failed = false) }
+                    viewModelScope.launchIO { loadOptions(item) }
                     coroutineScope {
                         when (item.type) {
                             BaseItemKind.BOX_SET -> loadCollection(itemId)
@@ -250,6 +271,97 @@ class JellyeyeInfoViewModel
             id: UUID,
         ) {
             navigationManager.navigateTo(Destination.MediaItem(id, BaseItemKind.PERSON))
+        }
+
+        /* ---------------- the options pop-up (Wholphin's own menu) ---------------- */
+
+        private suspend fun loadOptions(item: BaseItem) {
+            try {
+                val prefs = userPreferencesService.getCurrent()
+                val chosen =
+                    if (item.type == BaseItemKind.MOVIE || item.type == BaseItemKind.VIDEO || item.type == BaseItemKind.EPISODE) {
+                        itemPlaybackRepository.getSelectedTracks(item.id, item, prefs)
+                    } else {
+                        null
+                    }
+                val canDelete = mediaManagementService.canDelete(item)
+                _state.update { it.copy(chosenStreams = chosen, canDelete = canDelete) }
+            } catch (ex: Exception) {
+                Timber.w(ex, "Jellyeye: options failed to load")
+            }
+        }
+
+        val isAdministrator: Boolean get() = serverRepository.currentUserDto?.policy?.isAdministrator == true
+
+        val subtitleLanguage: String? get() = serverRepository.currentUserDto?.configuration?.subtitleLanguagePreference
+
+        fun navigateTo(destination: Destination) = navigationManager.navigateTo(destination)
+
+        fun setWatched(
+            itemId: UUID,
+            played: Boolean,
+        ) {
+            viewModelScope.launchIO {
+                try {
+                    favoriteWatchManager.setWatched(itemId, played)
+                    _state.value.item?.let { refreshItem(it.id) }
+                } catch (ex: Exception) {
+                    Timber.w(ex, "Jellyeye: watched failed")
+                }
+            }
+        }
+
+        fun setFavorite(
+            itemId: UUID,
+            favorite: Boolean,
+        ) {
+            viewModelScope.launchIO {
+                try {
+                    favoriteWatchManager.setFavorite(itemId, favorite)
+                    _state.value.item?.let { refreshItem(it.id) }
+                } catch (ex: Exception) {
+                    Timber.w(ex, "Jellyeye: favourite failed")
+                }
+            }
+        }
+
+        fun savePlayVersion(
+            item: BaseItem,
+            sourceId: UUID,
+        ) {
+            viewModelScope.launchIO {
+                val prefs = userPreferencesService.getCurrent()
+                val result = itemPlaybackRepository.savePlayVersion(item.id, sourceId)
+                val chosen = result?.let { itemPlaybackRepository.getChosenItemFromPlayback(item, it, prefs) }
+                _state.update { it.copy(chosenStreams = chosen) }
+            }
+        }
+
+        fun saveTrackSelection(
+            item: BaseItem,
+            itemPlayback: ItemPlayback?,
+            trackIndex: Int,
+            type: MediaStreamType,
+        ) {
+            viewModelScope.launchIO {
+                val prefs = userPreferencesService.getCurrent()
+                val result = itemPlaybackRepository.saveTrackSelection(item = item, itemPlayback = itemPlayback, trackIndex = trackIndex, type = type)
+                val chosen = itemPlaybackRepository.getChosenItemFromPlayback(item, result, prefs)
+                _state.update { it.copy(chosenStreams = chosen) }
+            }
+        }
+
+        fun clearChosenStreams(chosenStreams: ChosenStreams?) {
+            viewModelScope.launchIO {
+                itemPlaybackRepository.deleteChosenStreams(chosenStreams)
+                _state.value.item?.let { loadOptions(it) }
+            }
+        }
+
+        fun sendMediaReport(itemId: UUID) = serverReportService.sendMediaReportFor(itemId)
+
+        fun deleteThis(item: BaseItem) {
+            deleteItem(context, mediaManagementService, item) { navigationManager.goBack() }
         }
 
         /** A collection played start to finish in release order, or shuffled. */
