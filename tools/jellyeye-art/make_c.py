@@ -54,6 +54,11 @@ for dens, (leg, fg) in {'mdpi': (48, 108), 'hdpi': (72, 162), 'xhdpi': (96, 216)
         out.paste(base, (0, 0), mask)
         save(out.resize((leg, leg), Image.LANCZOS), f'{res}/mipmap-{dens}/{name}.webp')
 
+# Fire TV shows a sideloaded app's ordinary icon (not its banner), fitted to the height of a 16:9 tile and
+# centred on grey. So the ordinary icon is made 16:9 too: fitted into the tile it then fills all of it.
+for dens, size in {'mdpi': (160, 90), 'hdpi': (240, 135), 'xhdpi': (320, 180), 'xxhdpi': (480, 270), 'xxxhdpi': (640, 360)}.items():
+    save(banner.resize(size, Image.LANCZOS).convert('RGBA'), f'{res}/mipmap-{dens}/ic_launcher.webp')
+
 # previews
 banner.resize((960, 540), Image.LANCZOS).save(os.path.join(os.path.dirname(__file__), 'preview-banner-C.png'))
 Image.open(f'{res}/mipmap-xxxhdpi/ic_launcher.webp').resize((384, 384), Image.LANCZOS).save(os.path.join(os.path.dirname(__file__), 'preview-icon-C.png'))
