@@ -1,5 +1,7 @@
 package com.github.damontecres.wholphin.ui.cards
 
+import com.github.damontecres.wholphin.ui.jellyeye.JE
+import com.github.damontecres.wholphin.ui.jellyeye.coverRing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -157,11 +159,16 @@ fun SeasonCard(
         Card(
             modifier =
                 Modifier
+                    .coverRing(focused, JeRingCorner)
                     .size(imageWidth, imageHeight)
                     .aspectRatio(aspectRationToUse),
             onClick = onClick,
             onLongClick = onLongClick,
             interactionSource = interactionSource,
+            shape = jeCardShape(),
+            scale = jeCardScale(),
+            border = jeCardBorder(),
+            glow = jeCardGlow(),
             colors =
                 CardDefaults.colors(
                     containerColor = Color.Transparent,
@@ -204,25 +211,27 @@ fun SeasonCard(
             Text(
                 text = title ?: "",
                 maxLines = 1,
-                textAlign = TextAlign.Center,
+                textAlign = TextAlign.Start,
                 style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Bold,
+                color = if (focused) Color.White else JE.text,
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 4.dp)
+                        .padding(start = 6.dp, end = 4.dp)
                         .enableMarquee(focusedAfterDelay),
             )
             Text(
                 text = subtitle ?: "",
                 maxLines = 1,
-                textAlign = TextAlign.Center,
+                textAlign = TextAlign.Start,
                 style = MaterialTheme.typography.bodySmall,
+                color = JE.dim,
                 fontWeight = FontWeight.Normal,
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 4.dp)
+                        .padding(start = 6.dp, end = 4.dp)
                         .enableMarquee(focusedAfterDelay),
             )
         }

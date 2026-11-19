@@ -166,6 +166,10 @@ fun DestinationContent(
                     LaunchedEffect(Unit) { onClearBackdrop.invoke() }
                     PersonPage(preferences, original, modifier)
                 }
+                BaseItemKind.BOX_SET -> {
+                    LaunchedEffect(Unit) { onClearBackdrop.invoke() }
+                    CollectionDetails(preferences = preferences, itemId = destination.itemId, modifier = modifier)
+                }
                 else -> MovieDetails(preferences, original, modifier)
             }
         }
@@ -175,6 +179,7 @@ fun DestinationContent(
                 BaseItemKind.SERIES,
                 BaseItemKind.MOVIE,
                 BaseItemKind.PERSON,
+                BaseItemKind.BOX_SET,
                 -> {
                     LaunchedEffect(Unit) { onClearBackdrop.invoke() }
                     com.github.damontecres.wholphin.ui.jellyeye.JellyeyeInfo(
@@ -200,15 +205,6 @@ fun DestinationContent(
                         preferences,
                         destination,
                         modifier,
-                    )
-                }
-
-                BaseItemKind.BOX_SET -> {
-                    LaunchedEffect(Unit) { onClearBackdrop.invoke() }
-                    CollectionDetails(
-                        preferences = preferences,
-                        itemId = destination.itemId,
-                        modifier = modifier,
                     )
                 }
 

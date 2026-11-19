@@ -668,8 +668,9 @@ class CollectionFolderViewModel
         }
 
         override fun updateBackdrop(item: BaseItem) {
+            // Jellyeye: library pages keep the plain dark background of the home page
             viewModelScope.launchIO {
-                backdropService.submit(item)
+                backdropService.clearBackdrop()
             }
         }
 

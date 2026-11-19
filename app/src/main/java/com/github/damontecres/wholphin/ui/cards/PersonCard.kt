@@ -1,5 +1,6 @@
 package com.github.damontecres.wholphin.ui.cards
 
+import com.github.damontecres.wholphin.ui.jellyeye.coverRing
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -100,23 +101,14 @@ fun PersonCard(
         modifier = modifier,
     ) {
         Card(
-            modifier = Modifier,
+            modifier = Modifier.coverRing(focused, CircleShape),
             onClick = onClick,
             onLongClick = onLongClick,
             interactionSource = interactionSource,
-            shape = CardDefaults.shape(CircleShape),
-            border =
-                CardDefaults.border(
-                    focusedBorder =
-                        Border(
-                            border =
-                                BorderStroke(
-                                    width = 3.dp,
-                                    color = MaterialTheme.colorScheme.border,
-                                ),
-                            shape = CircleShape,
-                        ),
-                ),
+            shape = jeCardShape(CircleShape),
+            scale = jeCardScale(),
+            border = jeCardBorder(),
+            glow = jeCardGlow(),
             colors =
                 CardDefaults.colors(
                     containerColor = Color.Transparent,

@@ -1,5 +1,6 @@
 package com.github.damontecres.wholphin.ui.cards
 
+import com.github.damontecres.wholphin.ui.jellyeye.coverRing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -82,11 +83,16 @@ fun DiscoverItemCard(
         Card(
             modifier =
                 Modifier
+                    .coverRing(focused, JeRingCorner)
                     .size(width, Dp.Unspecified)
                     .aspectRatio(AspectRatios.TALL),
             onClick = onClick,
             onLongClick = onLongClick,
             interactionSource = interactionSource,
+            shape = jeCardShape(),
+            scale = jeCardScale(),
+            border = jeCardBorder(),
+            glow = jeCardGlow(),
             colors =
                 CardDefaults.colors(
                     containerColor = Color.Transparent,

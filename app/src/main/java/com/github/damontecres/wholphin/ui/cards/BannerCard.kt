@@ -1,5 +1,6 @@
 package com.github.damontecres.wholphin.ui.cards
 
+import com.github.damontecres.wholphin.ui.jellyeye.coverRing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -103,11 +104,17 @@ fun BannerCard(
     val currentOnClick by rememberUpdatedState(onClick)
     val currentOnLongClick by rememberUpdatedState(onLongClick)
 
+    val source = interactionSource ?: remember { MutableInteractionSource() }
+    val ringOn by source.collectIsFocusedAsState()
     Card(
-        modifier = modifier.size(cardHeight * aspectRatio, cardHeight),
+        modifier = modifier.coverRing(ringOn, JeRingCorner).size(cardHeight * aspectRatio, cardHeight),
         onClick = { currentOnClick() },
         onLongClick = { currentOnLongClick() },
-        interactionSource = interactionSource,
+        interactionSource = source,
+        shape = jeCardShape(),
+        scale = jeCardScale(),
+        border = jeCardBorder(),
+        glow = jeCardGlow(),
         colors =
             CardDefaults.colors(
 //                containerColor = Color.Transparent,

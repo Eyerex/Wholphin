@@ -1,5 +1,7 @@
 package com.github.damontecres.wholphin.ui.cards
 
+import com.github.damontecres.wholphin.ui.jellyeye.JE
+import com.github.damontecres.wholphin.ui.jellyeye.coverRing
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
@@ -73,10 +75,14 @@ fun GridCard(
         modifier = modifier,
     ) {
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.coverRing(focused, JeRingCorner).fillMaxWidth(),
             onClick = onClick,
             onLongClick = onLongClick,
             interactionSource = interactionSource,
+            shape = jeCardShape(),
+            scale = jeCardScale(),
+            border = jeCardBorder(),
+            glow = jeCardGlow(),
             colors =
                 CardDefaults.colors(
                     containerColor = Color.Transparent,
@@ -109,26 +115,28 @@ fun GridCard(
                 Text(
                     text = item?.title ?: "",
                     maxLines = 1,
-                    textAlign = TextAlign.Center,
+                    textAlign = TextAlign.Start,
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Bold,
+                    color = if (focused) Color.White else JE.text,
                     overflow = TextOverflow.Ellipsis,
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 4.dp)
+                            .padding(start = 6.dp, end = 4.dp)
                             .enableMarquee(focusedAfterDelay),
                 )
                 Text(
                     text = item?.subtitle ?: "",
                     maxLines = 1,
-                    textAlign = TextAlign.Center,
+                    textAlign = TextAlign.Start,
                     style = MaterialTheme.typography.bodySmall,
+                    color = JE.dim,
                     fontWeight = FontWeight.Normal,
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 4.dp)
+                            .padding(start = 6.dp, end = 4.dp)
                             .enableMarquee(focusedAfterDelay),
                 )
             }

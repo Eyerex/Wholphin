@@ -1,5 +1,8 @@
 package com.github.damontecres.wholphin.ui.cards
 
+import androidx.compose.runtime.getValue
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import com.github.damontecres.wholphin.ui.jellyeye.coverRing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -62,11 +65,16 @@ fun GenreCard(
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
 ) {
     val background = rememberIdColor(genreId).copy(alpha = .6f)
+    val ringOn by interactionSource.collectIsFocusedAsState()
     Card(
-        modifier = modifier,
+        modifier = modifier.coverRing(ringOn, JeRingCorner),
         onClick = onClick,
         onLongClick = onLongClick,
         interactionSource = interactionSource,
+        shape = jeCardShape(),
+        scale = jeCardScale(),
+        border = jeCardBorder(),
+        glow = jeCardGlow(),
         colors =
             CardDefaults.colors(
                 containerColor = Color.Transparent,

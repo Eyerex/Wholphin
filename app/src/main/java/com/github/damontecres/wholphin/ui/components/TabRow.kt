@@ -1,5 +1,7 @@
 package com.github.damontecres.wholphin.ui.components
 
+import com.github.damontecres.wholphin.ui.jellyeye.JE
+import com.github.damontecres.wholphin.ui.jellyeye.coverRing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -198,15 +200,12 @@ fun Tab(
     val density = LocalDensity.current
 
     val focused by interactionSource.collectIsFocusedAsState()
-    val contentColor =
-        if (rowActive || selected) {
-            MaterialTheme.colorScheme.onSurface
-        } else {
-            MaterialTheme.colorScheme.onSurface.copy(alpha = .5f)
-        }
+    // Jellyeye: tabs are pills, like the season buttons on the show page
+    val pill = androidx.compose.foundation.shape.RoundedCornerShape(30.dp)
     Box(
         modifier =
             modifier
+                .coverRing(focused, androidx.compose.foundation.shape.RoundedCornerShape(35.dp))
                 .clickable(
                     enabled = true,
                     interactionSource = interactionSource,
@@ -216,24 +215,26 @@ fun Tab(
                     tabWidth = with(density) { it.size.width.toDp() }
                 },
     ) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier,
-        ) {
-            Text(
-                text = title,
-                fontSize = 16.sp,
-                color = contentColor,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
-            TabIndicator(
-                selected = selected,
-                rowActive = rowActive,
-                focused = focused,
-                tabWidth = tabWidth,
-                modifier = Modifier.align(Alignment.CenterHorizontally),
-            )
-        }
+        Text(
+            text = title,
+            fontSize = 14.sp,
+            fontWeight =
+                if (selected) {
+                    androidx.compose.ui.text.font.FontWeight.Bold
+                } else {
+                    androidx.compose.ui.text.font.FontWeight.SemiBold
+                },
+            color =
+                when {
+                    selected -> JE.accent2
+                    focused || rowActive -> JE.text
+                    else -> JE.soft
+                },
+            modifier =
+                Modifier
+                    .background(if (selected) Color(0x33E5A00D) else Color(0x12FFFFFF), pill)
+                    .padding(horizontal = 16.dp, vertical = 7.dp),
+        )
     }
 }
 

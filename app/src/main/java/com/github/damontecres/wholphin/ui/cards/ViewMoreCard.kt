@@ -1,5 +1,6 @@
 package com.github.damontecres.wholphin.ui.cards
 
+import com.github.damontecres.wholphin.ui.jellyeye.coverRing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -83,11 +84,16 @@ fun ViewMoreCard(
         Card(
             modifier =
                 Modifier
+                    .coverRing(focused, JeRingCorner)
                     .size(width, height)
                     .aspectRatio(aspectRatio.ratio),
             onClick = onClick,
             onLongClick = onLongClick,
             interactionSource = interactionSource,
+            shape = jeCardShape(),
+            scale = jeCardScale(),
+            border = jeCardBorder(),
+            glow = jeCardGlow(),
             colors =
                 CardDefaults.colors(
                     containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp),

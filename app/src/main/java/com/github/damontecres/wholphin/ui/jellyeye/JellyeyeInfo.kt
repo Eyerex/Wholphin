@@ -145,6 +145,13 @@ fun JellyeyeInfo(
                 } else {
                     item(key = "hero") { Box(showTop) { InfoHeader(item, state, now, firstFocus, viewModel) } }
                     item(key = "about") { AboutRow(item) }
+                    if (item.type == BaseItemKind.BOX_SET && state.films.isNotEmpty()) {
+                        item(key = "collection") {
+                            SectionTile("In this collection · ${state.films.size}") {
+                                PosterGrid(state.films, rows = 70, onClick = viewModel::open, fullRowsOnly = false)
+                            }
+                        }
+                    }
                     if (item.type == BaseItemKind.SERIES && state.seasons.isNotEmpty()) {
                         item(key = "episodes") { Episodes(state, now, viewModel) }
                     }
@@ -183,17 +190,27 @@ private fun InfoHeader(
 ) {
     val imageUrls = LocalImageUrlService.current
     val isSeries = item.type == BaseItemKind.SERIES
+    val isCollection = item.type == BaseItemKind.BOX_SET
     val ud = item.data.userData
 
     // what Play does: a film resumes; a show resumes or plays its next episode
     val chosen = state.episodes.firstOrNull { it.id == state.chosenEpisodeId }
-    val target = if (isSeries) chosen ?: state.nextEpisode else item
+    val target =
+        when {
+            isSeries -> chosen ?: state.nextEpisode
+            // a collection plays the first thing you haven't watched yet
+            isCollection -> state.films.firstOrNull { it.data.userData?.played != true } ?: state.films.firstOrNull()
+            else -> item
+        }
     val resumeMs = target?.resumeMs ?: 0L
     val playLabel =
         when {
             isSeries && target != null ->
                 (if (resumeMs > 0) "Resume" else "Play") + " S${target.data.parentIndexNumber ?: "?"}:E${target.data.indexNumber ?: "?"}"
             isSeries -> "Play"
+            isCollection && target != null && resumeMs > 0 -> "Resume ${target.name ?: ""}"
+            isCollection && target != null -> "Play ${target.name ?: ""}"
+            isCollection -> "Play"
             resumeMs > 0 -> "Resume from ${clockText(resumeMs)}"
             else -> "Play"
         }
@@ -221,7 +238,11 @@ private fun InfoHeader(
             verticalArrangement = Arrangement.spacedBy(9.dp),
         ) {
             Text(
-                if (isSeries) "TV SHOW" else "FILM",
+                when {
+                    isSeries -> "TV SHOW"
+                    isCollection -> "COLLECTION"
+                    else -> "FILM"
+                },
                 color = JE.accent2,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
@@ -259,10 +280,13 @@ private fun InfoHeader(
                         end != null && end != start -> "$start–$end"
                         else -> "$start"
                     }
+                } else if (isCollection) {
+                    val ys = state.films.mapNotNull { it.data.productionYear }
+                    if (ys.isEmpty()) null else if (ys.min() == ys.max()) "${ys.min()}" else "${ys.min()}–${ys.max()}"
                 } else {
                     item.data.productionYear?.toString()
                 }
-            val meta = listOfNotNull(years, lengthText(item), item.data.genres?.take(3)?.joinToString(" · ")?.takeIf { it.isNotBlank() })
+            val meta = listOfNotNull(years, if (isCollection) state.films.size.takeIf { it > 0 }?.let { "$it titles" } else lengthText(item), item.data.genres?.take(3)?.joinToString(" · ")?.takeIf { it.isNotBlank() })
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(meta.joinToString("  ·  "), color = JE.soft, fontSize = 13.sp)
                 item.data.officialRating?.let {
