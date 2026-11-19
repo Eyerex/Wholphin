@@ -2,6 +2,7 @@ package com.github.damontecres.wholphin.ui.cards
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -35,16 +36,16 @@ fun ChapterRow(
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.padding(start = 8.dp),
         )
-        LazyRow(
-            state = rememberLazyListState(),
+        // Jellyeye: wraps onto new lines instead of scrolling sideways
+        FlowRow(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(vertical = 8.dp, horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .focusRestorer(),
+                    .padding(vertical = 8.dp, horizontal = 16.dp),
         ) {
-            itemsIndexed(chapters) { index, item ->
+            chapters.forEachIndexed { index, item ->
                 ChapterCard(
                     chapter = item,
                     onClick = { onClick(item) },

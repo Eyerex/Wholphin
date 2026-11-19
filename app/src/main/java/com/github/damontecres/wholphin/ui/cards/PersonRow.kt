@@ -3,6 +3,7 @@ package com.github.damontecres.wholphin.ui.cards
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -48,16 +49,16 @@ fun PersonRow(
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.padding(start = 8.dp),
         )
-        LazyRow(
-            state = rememberLazyListState(),
+        // Jellyeye: wraps onto new lines instead of scrolling sideways
+        FlowRow(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .focusRestorer(firstFocus),
+                    .padding(8.dp),
         ) {
-            itemsIndexed(people) { index, person ->
+            people.forEachIndexed { index, person ->
                 PersonCard(
                     person = person,
                     onClick = {
@@ -71,8 +72,7 @@ fun PersonRow(
                     modifier =
                         Modifier
                             .width(personRowCardWidth)
-                            .ifElse(index == position, Modifier.focusRequester(firstFocus))
-                            .animateItem(),
+                            .ifElse(index == position, Modifier.focusRequester(firstFocus)),
                 )
             }
         }
@@ -97,17 +97,16 @@ fun DiscoverPersonRow(
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onBackground,
         )
-        LazyRow(
-            state = rememberLazyListState(),
+        FlowRow(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier =
                 Modifier
                     .padding(start = 16.dp)
                     .fillMaxWidth()
-                    .focusRestorer(firstFocus),
+                    .padding(8.dp),
         ) {
-            itemsIndexed(people) { index, person ->
+            people.forEachIndexed { index, person ->
                 PersonCard(
                     name = person.title,
                     role = person.subtitle,
@@ -118,8 +117,7 @@ fun DiscoverPersonRow(
                     modifier =
                         Modifier
                             .width(personRowCardWidth)
-                            .ifElse(index == 0, Modifier.focusRequester(firstFocus))
-                            .animateItem(),
+                            .ifElse(index == 0, Modifier.focusRequester(firstFocus)),
                 )
             }
         }

@@ -84,6 +84,7 @@ sealed class Destination(
     data class OriginalDetails(
         val itemId: UUID,
         val type: BaseItemKind,
+        val seasonEpisode: SeasonEpisodeIds? = null,
     ) : Destination()
 
     @Serializable

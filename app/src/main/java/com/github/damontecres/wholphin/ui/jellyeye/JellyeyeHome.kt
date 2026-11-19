@@ -57,6 +57,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -163,6 +164,35 @@ fun JeFocusable(
         content(focused)
     }
 }
+
+/**
+ * A cover tile (poster or wide picture with its title underneath). The tile is what gets selected,
+ * but the orange ring is drawn only around the picture, via [coverRing].
+ */
+@Composable
+internal fun JeTile(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable (focused: Boolean) -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    Column(
+        modifier = modifier.clickable(interactionSource = interaction, indication = null, onClick = onClick),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        content(focused)
+    }
+}
+
+/** The orange ring with a small dark gap, around just the picture. Always takes the same space so nothing jumps. */
+internal fun Modifier.coverRing(
+    focused: Boolean,
+    shape: Shape = RoundedCornerShape(19.dp),
+): Modifier =
+    this
+        .border(3.dp, if (focused) JE.accent else Color.Transparent, shape)
+        .padding(5.dp)
 
 @Composable
 internal fun PillButton(
@@ -573,10 +603,11 @@ private fun WideGrid(
         items.take(columns * 2).chunked(columns).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 row.forEach { item ->
-                    JeFocusable(onClick = { onClick(item) }, modifier = Modifier.weight(1f)) {
+                    JeTile(onClick = { onClick(item) }, modifier = Modifier.weight(1f)) { focused ->
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Box(
                                 Modifier
+                                    .coverRing(focused)
                                     .fillMaxWidth()
                                     .aspectRatio(16f / 9f)
                                     .clip(RoundedCornerShape(14.dp))
@@ -622,21 +653,21 @@ private fun WideGrid(
                                 }
                             }
                             val title = if (item.type == BaseItemKind.EPISODE) item.data.seriesName ?: "" else item.name ?: ""
-                            Text(title, color = JE.text, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+                            Text(title, color = JE.text, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 5.dp, top = 2.dp))
                             val sub =
                                 if (item.type == BaseItemKind.EPISODE) {
                                     "S${item.data.parentIndexNumber ?: "?"}:E${item.data.indexNumber ?: "?"} · ${item.name ?: ""}"
                                 } else {
                                     item.data.productionYear?.toString() ?: ""
                                 }
-                            Text(sub, color = JE.dim, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(sub, color = JE.dim, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 5.dp))
                             val run = minutesOf(item.data.runTimeTicks)
                             val pos = minutesOf(item.data.userData?.playbackPositionTicks)
                             if (run > 0) {
                                 val left = (run - pos).coerceAtLeast(1)
                                 val text =
                                     if (pos > 0) "$left min left · finishes at ${finishAt(now, left)}" else "Up next · finishes at ${finishAt(now, run)}"
-                                Text(text, color = JE.accent2, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                                Text(text, color = JE.accent2, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.padding(start = 5.dp))
                             }
                         }
                     }
@@ -670,10 +701,11 @@ internal fun PosterGrid(
         items.take(count).chunked(columns).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 row.forEach { item ->
-                    JeFocusable(onClick = { onClick(item) }, modifier = Modifier.weight(1f)) { focused ->
+                    JeTile(onClick = { onClick(item) }, modifier = Modifier.weight(1f)) { focused ->
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Box(
                                 Modifier
+                                    .coverRing(focused)
                                     .fillMaxWidth()
                                     .aspectRatio(2f / 3f)
                                     .clip(RoundedCornerShape(14.dp))
@@ -720,10 +752,10 @@ internal fun PosterGrid(
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(top = 4.dp),
+                                modifier = Modifier.padding(start = 5.dp, top = 2.dp),
                             )
                             val sub = listOfNotNull(item.data.productionYear?.toString(), lengthText(item)).joinToString(" · ")
-                            Text(sub, color = JE.dim, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(sub, color = JE.dim, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 5.dp))
                         }
                     }
                 }

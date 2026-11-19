@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -98,7 +99,6 @@ fun DiscoverItemRow(
     horizontalPadding: Dp = 16.dp,
     onClickViewMore: () -> Unit = {},
 ) {
-    val state = rememberLazyListState()
     val firstFocus = remember { FocusRequester() }
     val focusRequester = remember { FocusRequester() }
     var position by rememberInt()
@@ -112,24 +112,24 @@ fun DiscoverItemRow(
         modifier =
             modifier.focusProperties {
                 onEnter = {
-                    focusRequester.tryRequestFocus()
+                    if (requestedFocusDirection == androidx.compose.ui.focus.FocusDirection.Enter) firstFocus.tryRequestFocus()
                 }
             },
     ) {
         ItemRowTitle(title)
 
-        LazyRow(
-            state = state,
+        // Jellyeye: wraps onto new lines instead of scrolling sideways
+        androidx.compose.foundation.layout.FlowRow(
             horizontalArrangement = Arrangement.spacedBy(horizontalPadding),
-            contentPadding = PaddingValues(horizontal = horizontalPadding, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(horizontalPadding.coerceAtLeast(12.dp)),
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .padding(horizontal = horizontalPadding, vertical = 8.dp)
                     .focusGroup()
-                    .focusRestorer(firstFocus)
                     .focusRequester(focusRequester),
         ) {
-            itemsIndexed(items) { index, item ->
+            (if (items.size > 60) items.subList(0, 60) else items).forEachIndexed { index, item ->
                 val cardModifier =
                     remember(index, position) {
                         if (index == position) {
@@ -168,7 +168,7 @@ fun DiscoverItemRow(
                 )
             }
             if (enableViewMore) {
-                item {
+                run {
                     ViewMoreCard(
                         onClick =
                             remember {

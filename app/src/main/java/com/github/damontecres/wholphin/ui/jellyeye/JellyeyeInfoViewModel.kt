@@ -6,6 +6,7 @@ import com.github.damontecres.wholphin.data.ServerRepository
 import com.github.damontecres.wholphin.data.model.BaseItem
 import com.github.damontecres.wholphin.services.FavoriteWatchManager
 import com.github.damontecres.wholphin.services.NavigationManager
+import com.github.damontecres.wholphin.ui.detail.series.SeasonEpisodeIds
 import com.github.damontecres.wholphin.ui.launchIO
 import com.github.damontecres.wholphin.ui.nav.Destination
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -40,6 +41,8 @@ data class JellyeyeInfoState(
     val seasonId: UUID? = null,
     val episodes: List<BaseItem> = emptyList(),
     val nextEpisode: BaseItem? = null,
+    // the episode that was opened (from search, a library row…), if any
+    val chosenEpisodeId: UUID? = null,
     // films and TV shows
     val similar: List<BaseItem> = emptyList(),
     // people
@@ -60,16 +63,20 @@ class JellyeyeInfoViewModel
         val state: StateFlow<JellyeyeInfoState> = _state
 
         private var loadedId: UUID? = null
+        private var seasonEpisode: SeasonEpisodeIds? = null
 
         private val rowFields =
             listOf(ItemFields.OVERVIEW, ItemFields.GENRES, ItemFields.CHILD_COUNT, ItemFields.PRIMARY_IMAGE_ASPECT_RATIO)
 
         fun load(
             itemId: UUID,
+            seasonEpisode: SeasonEpisodeIds? = null,
             force: Boolean = false,
         ) {
             if (!force && loadedId == itemId) return
             loadedId = itemId
+            this.seasonEpisode = seasonEpisode
+            _state.update { it.copy(chosenEpisodeId = seasonEpisode?.episodeId) }
             viewModelScope.launchIO {
                 try {
                     val item = BaseItem(api.libraryApi.getItem(itemId).content, false)
@@ -165,7 +172,8 @@ class JellyeyeInfoViewModel
                     null
                 }
             val seasonId =
-                next?.data?.seasonId
+                seasonEpisode?.seasonId?.takeIf { id -> seasons.any { it.id == id } }
+                    ?: next?.data?.seasonId
                     ?: seasons.firstOrNull { (it.data.indexNumber ?: 0) > 0 }?.id
                     ?: seasons.firstOrNull()?.id
             _state.update { it.copy(seasons = seasons, nextEpisode = next, seasonId = seasonId) }
@@ -224,7 +232,7 @@ class JellyeyeInfoViewModel
         /** Wholphin's original details page, for its extra options. */
         fun openOriginal() {
             val item = _state.value.item ?: return
-            navigationManager.navigateTo(Destination.OriginalDetails(item.id, item.type))
+            navigationManager.navigateTo(Destination.OriginalDetails(item.id, item.type, seasonEpisode))
         }
 
         fun toggleFavorite() {

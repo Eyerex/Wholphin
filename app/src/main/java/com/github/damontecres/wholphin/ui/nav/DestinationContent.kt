@@ -135,11 +135,13 @@ fun DestinationContent(
             UserProfilePreferencesPage(modifier)
         }
 
+        // a season or episode: Jellyeye's show page, opened at that season (no sideways episode strip)
         is Destination.SeriesOverview -> {
-            SeriesOverview(
+            LaunchedEffect(Unit) { onClearBackdrop.invoke() }
+            com.github.damontecres.wholphin.ui.jellyeye.JellyeyeInfo(
+                itemId = destination.itemId,
+                seasonEpisode = destination.seasonEpisode,
                 preferences = preferences,
-                destination = destination,
-                initialSeasonEpisode = destination.seasonEpisode,
                 modifier = modifier,
             )
         }
@@ -147,7 +149,19 @@ fun DestinationContent(
         is Destination.OriginalDetails -> {
             val original = Destination.MediaItem(destination.itemId, destination.type)
             when (destination.type) {
-                BaseItemKind.SERIES -> SeriesDetails(preferences, original, modifier)
+                BaseItemKind.SERIES -> {
+                    val se = destination.seasonEpisode
+                    if (se != null) {
+                        SeriesOverview(
+                            preferences = preferences,
+                            destination = Destination.SeriesOverview(destination.itemId, destination.type, se),
+                            initialSeasonEpisode = se,
+                            modifier = modifier,
+                        )
+                    } else {
+                        SeriesDetails(preferences, original, modifier)
+                    }
+                }
                 BaseItemKind.PERSON -> {
                     LaunchedEffect(Unit) { onClearBackdrop.invoke() }
                     PersonPage(preferences, original, modifier)

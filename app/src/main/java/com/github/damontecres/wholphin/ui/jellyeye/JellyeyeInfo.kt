@@ -54,6 +54,7 @@ import coil3.compose.AsyncImage
 import com.github.damontecres.wholphin.data.model.BaseItem
 import com.github.damontecres.wholphin.preferences.UserPreferences
 import com.github.damontecres.wholphin.ui.LocalImageUrlService
+import com.github.damontecres.wholphin.ui.detail.series.SeasonEpisodeIds
 import com.github.damontecres.wholphin.ui.tryRequestFocus
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -82,9 +83,10 @@ fun JellyeyeInfo(
     itemId: UUID,
     preferences: UserPreferences,
     modifier: Modifier = Modifier,
-    viewModel: JellyeyeInfoViewModel = hiltViewModel(key = "jellyeye-info-$itemId"),
+    seasonEpisode: SeasonEpisodeIds? = null,
+    viewModel: JellyeyeInfoViewModel = hiltViewModel(key = "jellyeye-info-$itemId-${seasonEpisode?.seasonId}-${seasonEpisode?.episodeId}"),
 ) {
-    LaunchedEffect(itemId) { viewModel.load(itemId) }
+    LaunchedEffect(itemId) { viewModel.load(itemId, seasonEpisode) }
     val state by viewModel.state.collectAsState()
     var now by remember { mutableStateOf(LocalDateTime.now()) }
     LaunchedEffect(Unit) {
@@ -184,7 +186,8 @@ private fun InfoHeader(
     val ud = item.data.userData
 
     // what Play does: a film resumes; a show resumes or plays its next episode
-    val target = if (isSeries) state.nextEpisode else item
+    val chosen = state.episodes.firstOrNull { it.id == state.chosenEpisodeId }
+    val target = if (isSeries) chosen ?: state.nextEpisode else item
     val resumeMs = target?.resumeMs ?: 0L
     val playLabel =
         when {
@@ -445,9 +448,10 @@ private fun Episodes(
         }
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             state.episodes.forEach { ep ->
-                val isNext = ep.id == state.nextEpisode?.id
+                val isChosen = ep.id == state.chosenEpisodeId
+                val isNext = isChosen || (state.chosenEpisodeId == null && ep.id == state.nextEpisode?.id)
                 val eud = ep.data.userData
-                JeFocusable(onClick = { viewModel.play(ep) }, corner = 14.dp, modifier = Modifier.fillMaxWidth()) {
+                JeTile(onClick = { viewModel.play(ep) }, modifier = Modifier.fillMaxWidth()) { focused ->
                     Row(
                         modifier =
                             Modifier
@@ -461,6 +465,7 @@ private fun Episodes(
                     ) {
                         Box(
                             Modifier
+                                .coverRing(focused, RoundedCornerShape(15.dp))
                                 .width(150.dp)
                                 .aspectRatio(16f / 9f)
                                 .clip(RoundedCornerShape(10.dp))
@@ -478,7 +483,7 @@ private fun Episodes(
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text(
                                 "${ep.data.indexNumber?.let { "$it. " } ?: ""}${ep.name ?: ""}",
-                                color = JE.text,
+                                color = if (focused) Color.White else JE.text,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
@@ -489,7 +494,7 @@ private fun Episodes(
                                     minutesOf(ep.data.runTimeTicks).takeIf { it > 0 }?.let { lengthOf(it) },
                                     ep.data.premiereDate?.toLocalDate()?.format(DateTimeFormatter.ofPattern("d MMM yyyy", Locale.UK)),
                                     if (eud?.played == true) "✓ Watched" else null,
-                                    if (isNext) "Up next" else null,
+                                    if (isChosen) "Selected" else if (isNext) "Up next" else null,
                                 )
                             Text(bits.joinToString(" · "), color = if (isNext) JE.accent2 else JE.dim, fontSize = 11.sp)
                             ep.data.overview?.let {
@@ -517,7 +522,7 @@ private fun CastGrid(
         cast.chunked(columns).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 row.forEach { person ->
-                    JeFocusable(onClick = { onClick(person) }, corner = 14.dp, modifier = Modifier.weight(1f)) {
+                    JeTile(onClick = { onClick(person) }, modifier = Modifier.weight(1f)) { focused ->
                         Column(
                             Modifier.fillMaxWidth().padding(vertical = 4.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -525,6 +530,7 @@ private fun CastGrid(
                         ) {
                             Box(
                                 Modifier
+                                    .coverRing(focused, CircleShape)
                                     .size(64.dp)
                                     .clip(CircleShape)
                                     .background(Color(0xFF2B2E33)),
