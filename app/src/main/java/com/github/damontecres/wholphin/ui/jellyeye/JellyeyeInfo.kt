@@ -387,8 +387,8 @@ private fun clockText(ms: Long): String {
 @Composable
 private fun AboutRow(item: BaseItem) {
     val isSeries = item.type == BaseItemKind.SERIES
-    Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(JeLayout.panelGap)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             item.data.taglines?.firstOrNull()?.let {
                 Text(it, color = JE.accent2, fontSize = 15.sp, fontStyle = FontStyle.Italic)
             }
@@ -416,23 +416,26 @@ private fun AboutRow(item: BaseItem) {
                 }
             }
         }
-        Column(
+        // ratings on the left, details laid out across the rest of the width
+        Row(
             Modifier
-                .width(270.dp)
-                .clip(RoundedCornerShape(18.dp))
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
                 .background(JE.tile)
-                .border(1.dp, JE.line, RoundedCornerShape(18.dp))
+                .border(1.dp, JE.line, RoundedCornerShape(20.dp))
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(9.dp),
+            horizontalArrangement = Arrangement.spacedBy(28.dp),
         ) {
             val community = item.data.communityRating
             val critic = item.data.criticRating
             val progress = item.data.userData?.playedPercentage
             if (community != null || critic != null || (progress ?: 0.0) > 0.0) {
-                Label("Ratings")
-                community?.let { Meter("Audience", "★ ${"%.1f".format(it)} / 10", it / 10f, JE.accent) }
-                critic?.let { Meter("Critics", "${it.toInt()}%", it / 100f, JE.critic) }
-                if (!isSeries && (progress ?: 0.0) > 0.0) Meter("Your progress", "${progress!!.toInt()}%", (progress / 100).toFloat(), Color(0xFF4ADE80))
+                Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Label("Ratings")
+                    community?.let { Meter("Audience", "★ ${"%.1f".format(it)} / 10", it / 10f, JE.accent) }
+                    critic?.let { Meter("Critics", "${it.toInt()}%", it / 100f, JE.critic) }
+                    if (!isSeries && (progress ?: 0.0) > 0.0) Meter("Your progress", "${progress!!.toInt()}%", (progress / 100).toFloat(), Color(0xFF4ADE80))
+                }
             }
             val people = item.data.people.orEmpty()
             val streams = item.data.mediaStreams.orEmpty()
@@ -465,11 +468,18 @@ private fun AboutRow(item: BaseItem) {
                     subs.takeIf { it > 0 }?.let { "Subtitles" to (if (it == 1) "1 track" else "$it tracks") },
                 )
             if (facts.isNotEmpty()) {
-                Label("Details")
-                facts.forEach { (k, v) ->
-                    Row {
-                        Text(k, color = JE.dim, fontSize = 12.sp, modifier = Modifier.width(78.dp))
-                        Text(v, color = JE.text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Label("Details")
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        facts.forEach { (k, v) ->
+                            Column(Modifier.width(170.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(k, color = JE.dim, fontSize = 11.sp)
+                                Text(v, color = JE.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
                     }
                 }
             }
