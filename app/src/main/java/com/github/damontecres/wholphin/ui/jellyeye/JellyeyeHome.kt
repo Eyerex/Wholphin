@@ -488,10 +488,17 @@ internal fun Spotlight(
                 Chip(badge(index, items.size), gold = true)
                 if (current.why.isNotBlank()) Chip(current.why)
             }
-            Spacer(Modifier.weight(1f))
 
             val item = current.item
-            Column(Modifier.widthIn(max = 560.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // everything between the labels and the tabs shares the space that's left, sitting at the bottom;
+            // if a title has a big logo or lots of details, the summary gives way so the tabs are never pushed off
+            Column(
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.Bottom),
+            ) {
                 var logoFailed by remember(item.id) { mutableStateOf(false) }
                 val logo = remember(item.id) { imageUrls.getItemImageUrl(item, ImageType.LOGO) }
                 if (logo != null && !logoFailed && item.data.imageTags?.containsKey(ImageType.LOGO) == true) {
@@ -549,9 +556,8 @@ internal fun Spotlight(
                     lineHeight = 20.sp,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 560.dp).weight(1f, fill = false),
                 )
-            }
-            Spacer(Modifier.height(8.dp))
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -571,6 +577,7 @@ internal fun Spotlight(
                         modifier = Modifier.padding(start = 8.dp),
                     )
                 }
+            }
             }
 
             Spacer(Modifier.height(10.dp))
