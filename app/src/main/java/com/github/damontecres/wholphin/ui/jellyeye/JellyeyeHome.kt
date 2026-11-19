@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -119,6 +120,15 @@ object JE {
     val ghost = Color(0x21FFFFFF)
 }
 
+/** The same space everywhere: banner height, page margins and the gap between panels. */
+internal object JeLayout {
+    val bannerHeight = 372.dp
+    val pageMargin = 36.dp
+    val pageTop = 16.dp
+    val pageBottom = 48.dp
+    val panelGap = 16.dp
+}
+
 internal val clockFormat = DateTimeFormatter.ofPattern("HH:mm")
 
 internal fun minutesOf(ticks: Long?): Long = (ticks ?: 0L) / 600_000_000L
@@ -207,6 +217,8 @@ internal fun PillButton(
             color = if (primary) JE.onAccent else Color.White,
             fontSize = 15.sp,
             fontWeight = if (primary) FontWeight.ExtraBold else FontWeight.SemiBold,
+            maxLines = 1,
+            softWrap = false,
             modifier =
                 Modifier
                     .clip(RoundedCornerShape(30.dp))
@@ -341,8 +353,14 @@ fun JellyeyeHome(
         LazyColumn(
             state = listState,
             // equal margins left and right; the left one also keeps clear of the hidden menu strip
-            contentPadding = PaddingValues(start = 36.dp, end = 36.dp, top = 16.dp, bottom = 48.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding =
+                PaddingValues(
+                    start = JeLayout.pageMargin,
+                    end = JeLayout.pageMargin,
+                    top = JeLayout.pageTop,
+                    bottom = JeLayout.pageBottom,
+                ),
+            verticalArrangement = Arrangement.spacedBy(JeLayout.panelGap),
             modifier = Modifier.fillMaxSize(),
         ) {
             if (state.spotlight.isNotEmpty()) {
@@ -399,13 +417,17 @@ fun JellyeyeHome(
 private const val SLIDE_MS = 8_000
 
 @Composable
-private fun Spotlight(
+internal fun Spotlight(
     modifier: Modifier = Modifier,
     items: List<SpotlightItem>,
     now: LocalDateTime,
     playFocus: FocusRequester,
     onPlay: (BaseItem) -> Unit,
     onInfo: (BaseItem) -> Unit,
+    // the gold label top-left; the home page counts the slides, a collection names itself
+    badge: (index: Int, count: Int) -> String = { i, n -> "Spotlight ${i + 1} of $n" },
+    // extra buttons after Play and More info (a collection adds Favourite, Watched, More options)
+    extraButtons: @Composable () -> Unit = {},
 ) {
     var index by remember { mutableIntStateOf(0) }
     if (index >= items.size) index = 0
@@ -430,7 +452,7 @@ private fun Spotlight(
         modifier =
             modifier
                 .fillMaxWidth()
-                .height(372.dp)
+                .height(JeLayout.bannerHeight)
                 .clip(RoundedCornerShape(24.dp))
                 .background(Color(0xFF111214))
                 .border(1.dp, JE.line, RoundedCornerShape(24.dp)),
@@ -463,8 +485,8 @@ private fun Spotlight(
 
         Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 12.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Chip("Spotlight ${index + 1} of ${items.size}", gold = true)
-                Chip(current.why)
+                Chip(badge(index, items.size), gold = true)
+                if (current.why.isNotBlank()) Chip(current.why)
             }
             Spacer(Modifier.weight(1f))
 
@@ -528,19 +550,26 @@ private fun Spotlight(
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    PillButton("▶  Play", onClick = { onPlay(item) }, primary = true, focusRequester = playFocus)
-                    PillButton("ⓘ  More info", onClick = { onInfo(item) })
-                    val mins =
-                        if (item.type == BaseItemKind.SERIES) 0L else minutesOf(item.data.runTimeTicks)
-                    if (mins > 0) {
-                        Text(
-                            "Start now and you finish at ${finishAt(now, mins)}",
-                            color = Color(0xFFB8BCC2),
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(start = 8.dp),
-                        )
-                    }
+            }
+            Spacer(Modifier.height(8.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                itemVerticalAlignment = Alignment.CenterVertically,
+            ) {
+                PillButton("▶  Play", onClick = { onPlay(item) }, primary = true, focusRequester = playFocus)
+                PillButton("ⓘ  More info", onClick = { onInfo(item) })
+                extraButtons()
+                val mins =
+                    if (item.type == BaseItemKind.SERIES) 0L else minutesOf(item.data.runTimeTicks)
+                if (mins > 0) {
+                    Text(
+                        "Start now and you finish at ${finishAt(now, mins)}",
+                        color = Color(0xFFB8BCC2),
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
                 }
             }
 

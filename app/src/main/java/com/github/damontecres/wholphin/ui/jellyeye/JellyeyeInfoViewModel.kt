@@ -83,25 +83,7 @@ class JellyeyeInfoViewModel
                     _state.update { it.copy(item = item, failed = false) }
                     coroutineScope {
                         when (item.type) {
-                            BaseItemKind.BOX_SET -> {
-                                // a collection: everything in it, oldest first, shown as a grid going down
-                                val children =
-                                    api.libraryApi
-                                        .getItems(
-                                            GetItemsRequest(
-                                                userId = serverRepository.currentUser?.id,
-                                                parentId = itemId,
-                                                fields = rowFields,
-                                                sortBy = listOf(ItemSortBy.PREMIERE_DATE, ItemSortBy.PRODUCTION_YEAR, ItemSortBy.SORT_NAME),
-                                                sortOrder = listOf(SortOrder.ASCENDING, SortOrder.ASCENDING, SortOrder.ASCENDING),
-                                                enableUserData = true,
-                                                limit = 500,
-                                            ),
-                                        ).content
-                                        .items
-                                        .map { BaseItem(it, false) }
-                                _state.update { it.copy(films = children) }
-                            }
+                            BaseItemKind.BOX_SET -> loadCollection(itemId)
 
                             BaseItemKind.PERSON -> {
                                 val all =
@@ -141,6 +123,26 @@ class JellyeyeInfoViewModel
                     _state.update { it.copy(failed = true) }
                 }
             }
+        }
+
+        /** A collection: everything in it, oldest first, shown as a grid going down. */
+        private suspend fun loadCollection(itemId: UUID) {
+            val children =
+                    api.libraryApi
+                        .getItems(
+                            GetItemsRequest(
+                                userId = serverRepository.currentUser?.id,
+                                parentId = itemId,
+                                fields = rowFields,
+                                sortBy = listOf(ItemSortBy.PREMIERE_DATE, ItemSortBy.PRODUCTION_YEAR, ItemSortBy.SORT_NAME),
+                                sortOrder = listOf(SortOrder.ASCENDING, SortOrder.ASCENDING, SortOrder.ASCENDING),
+                                enableUserData = true,
+                                limit = 500,
+                            ),
+                        ).content
+                        .items
+                        .map { BaseItem(it, false) }
+                _state.update { it.copy(films = children) }
         }
 
         private suspend fun similar(itemId: UUID): List<BaseItem> =
@@ -277,6 +279,7 @@ class JellyeyeInfoViewModel
                     refreshItem(item.id)
                     val seasonId = _state.value.seasonId
                     if (item.type == BaseItemKind.SERIES && seasonId != null) loadEpisodes(item.id, seasonId)
+                    if (item.type == BaseItemKind.BOX_SET) loadCollection(item.id)
                 } catch (ex: Exception) {
                     Timber.w(ex, "Jellyeye: watched failed")
                 }

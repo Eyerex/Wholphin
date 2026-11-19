@@ -41,6 +41,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -108,9 +109,13 @@ fun JellyeyeInfo(
             return@Box
         }
         val firstFocus = remember { FocusRequester() }
-        LaunchedEffect(item.id) {
-            delay(150)
-            firstFocus.tryRequestFocus()
+        // a collection's Play button only appears once its films have loaded
+        val focusReady = item.type != BaseItemKind.BOX_SET || state.films.isNotEmpty()
+        LaunchedEffect(item.id, focusReady) {
+            if (focusReady) {
+                delay(150)
+                firstFocus.tryRequestFocus()
+            }
         }
         val listState = rememberLazyListState()
         val scope = rememberCoroutineScope()
@@ -122,12 +127,21 @@ fun JellyeyeInfo(
         CompositionLocalProvider(LocalBringIntoViewSpec provides JellyeyeScrollSpec) {
             LazyColumn(
                 state = listState,
-                contentPadding = PaddingValues(start = 36.dp, end = 36.dp, top = 16.dp, bottom = 48.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp),
+                contentPadding =
+                    PaddingValues(
+                        start = JeLayout.pageMargin,
+                        end = JeLayout.pageMargin,
+                        top = JeLayout.pageTop,
+                        bottom = JeLayout.pageBottom,
+                    ),
+                verticalArrangement = Arrangement.spacedBy(JeLayout.panelGap),
                 modifier = Modifier.fillMaxSize(),
             ) {
                 if (item.type == BaseItemKind.PERSON) {
                     item(key = "person") { Box(showTop) { PersonHeader(item, state, firstFocus, viewModel) } }
+                    item.data.overview?.takeIf { it.isNotBlank() }?.let { bio ->
+                        item(key = "bio") { Biography(bio) }
+                    }
                     if (state.films.isNotEmpty()) {
                         item(key = "films") {
                             SectionTile("Films in your library · ${state.films.size}") {
@@ -143,7 +157,15 @@ fun JellyeyeInfo(
                         }
                     }
                 } else {
-                    item(key = "hero") { Box(showTop) { InfoHeader(item, state, now, firstFocus, viewModel) } }
+                    item(key = "hero") {
+                        Box(showTop) {
+                            if (item.type == BaseItemKind.BOX_SET) {
+                                CollectionSpotlight(item, state, now, firstFocus, viewModel)
+                            } else {
+                                InfoHeader(item, state, now, firstFocus, viewModel)
+                            }
+                        }
+                    }
                     item(key = "about") { AboutRow(item) }
                     if (item.type == BaseItemKind.BOX_SET && state.films.isNotEmpty()) {
                         item(key = "collection") {
@@ -203,15 +225,12 @@ private fun InfoHeader(
             else -> item
         }
     val resumeMs = target?.resumeMs ?: 0L
+    // keep the button short; what it plays goes on the line underneath
     val playLabel =
         when {
             isSeries && target != null ->
                 (if (resumeMs > 0) "Resume" else "Play") + " S${target.data.parentIndexNumber ?: "?"}:E${target.data.indexNumber ?: "?"}"
-            isSeries -> "Play"
-            isCollection && target != null && resumeMs > 0 -> "Resume ${target.name ?: ""}"
-            isCollection && target != null -> "Play ${target.name ?: ""}"
-            isCollection -> "Play"
-            resumeMs > 0 -> "Resume from ${clockText(resumeMs)}"
+            resumeMs > 0 -> "Resume"
             else -> "Play"
         }
     val runMins = minutesOf((target ?: item).data.runTimeTicks)
@@ -220,7 +239,7 @@ private fun InfoHeader(
     Box(
         Modifier
             .fillMaxWidth()
-            .height(330.dp)
+            .height(JeLayout.bannerHeight)
             .clip(RoundedCornerShape(24.dp))
             .background(Color(0xFF111214))
             .border(1.dp, JE.line, RoundedCornerShape(24.dp)),
@@ -301,7 +320,8 @@ private fun InfoHeader(
                     )
                 }
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            // buttons drop onto a second line rather than squashing when there isn't room
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 PillButton("▶  $playLabel", onClick = { (target ?: item).let { viewModel.play(it) } }, primary = true, focusRequester = firstFocus)
                 if (resumeMs > 0 && target != null) {
                     PillButton("From the start", onClick = { viewModel.play(target, fromStart = true) })
@@ -310,14 +330,21 @@ private fun InfoHeader(
                 PillButton(if (ud?.played == true) "✓  Watched" else "Mark watched", onClick = viewModel::toggleWatched)
                 PillButton("More options", onClick = viewModel::openOriginal)
             }
-            if (runMins > 0) {
-                val text =
-                    if (resumeMs > 0) {
-                        "$leftMins min left · ends at ${finishAt(now, leftMins)}"
-                    } else {
-                        "${lengthOf(runMins)} · ends at ${finishAt(now, runMins)}"
-                    }
-                Text(text, color = Color(0xFFB8BCC2), fontSize = 12.sp)
+            val what =
+                when {
+                    target == null || target.id == item.id -> null
+                    isSeries -> "Next: S${target.data.parentIndexNumber ?: "?"}:E${target.data.indexNumber ?: "?"} · ${target.name ?: ""}"
+                    else -> "Next: ${target.name ?: ""}"
+                }
+            val timing =
+                when {
+                    runMins <= 0 -> null
+                    resumeMs > 0 -> "from ${clockText(resumeMs)} · $leftMins min left · ends at ${finishAt(now, leftMins)}"
+                    else -> "${lengthOf(runMins)} · ends at ${finishAt(now, runMins)}"
+                }
+            val line = listOfNotNull(what, timing).joinToString(" · ")
+            if (line.isNotBlank()) {
+                Text(line, color = Color(0xFFB8BCC2), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -594,7 +621,7 @@ private fun PersonHeader(
     viewModel: JellyeyeInfoViewModel,
 ) {
     val imageUrls = LocalImageUrlService.current
-    val photo = remember(person.id) { imageUrls.getItemImageUrl(person, ImageType.PRIMARY, fillWidth = 400) }
+    val photo = remember(person.id) { imageUrls.getItemImageUrl(person, ImageType.PRIMARY, fillWidth = 500) }
     val born = person.data.premiereDate?.toLocalDate()
     val died = person.data.endDate?.toLocalDate()
     val place = person.data.productionLocations?.firstOrNull()
@@ -605,20 +632,29 @@ private fun PersonHeader(
             place != null -> "Born in $place"
             else -> null
         }
-    var bioOpen by remember(person.id) { mutableStateOf(false) }
-    Column(
+    // a backdrop from their best-known title in your library, so the banner looks like the others
+    val backdropFrom = remember(state.films, state.shows) { (state.films + state.shows).maxByOrNull { it.data.communityRating ?: 0f } }
+    Box(
         Modifier
             .fillMaxWidth()
+            .height(JeLayout.bannerHeight)
             .clip(RoundedCornerShape(24.dp))
-            .background(Brush.linearGradient(listOf(Color(0x33E5A00D), JE.tile)))
-            .border(1.dp, JE.line, RoundedCornerShape(24.dp))
-            .padding(22.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .background(Brush.linearGradient(listOf(Color(0x33E5A00D), Color(0xFF111214))))
+            .border(1.dp, JE.line, RoundedCornerShape(24.dp)),
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.Bottom) {
+        if (backdropFrom != null) {
+            val url = remember(backdropFrom.id) { imageUrls.getItemImageUrl(backdropFrom, ImageType.BACKDROP, fillWidth = 1280) }
+            AsyncImage(model = url, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 0.45f })
+            Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color(0xF2111214), Color(0xB3111214), Color(0x40111214)))))
+        }
+        Row(
+            Modifier.fillMaxSize().padding(22.dp),
+            horizontalArrangement = Arrangement.spacedBy(24.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
             Box(
                 Modifier
-                    .width(140.dp)
+                    .fillMaxHeight()
                     .aspectRatio(2f / 3f)
                     .clip(RoundedCornerShape(16.dp))
                     .background(Color(0xFF2B2E33)),
@@ -628,34 +664,94 @@ private fun PersonHeader(
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("CAST & CREW", color = JE.accent2, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
-                Text(person.name ?: "", color = Color.White, fontSize = 36.sp, lineHeight = 38.sp, fontWeight = FontWeight.ExtraBold)
-                line?.let { Text(it, color = JE.soft, fontSize = 13.sp) }
+                Text(person.name ?: "", color = Color.White, fontSize = 36.sp, lineHeight = 38.sp, fontWeight = FontWeight.ExtraBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                line?.let { Text(it, color = JE.soft, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 Row(horizontalArrangement = Arrangement.spacedBy(26.dp)) {
                     Stat(state.films.size, if (state.films.size == 1) "film in your library" else "films in your library")
                     Stat(state.shows.size, if (state.shows.size == 1) "TV show" else "TV shows")
                     Stat((state.films + state.shows).count { it.data.userData?.played == true }, "watched")
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     val fav = person.data.userData?.isFavorite == true
                     PillButton(if (fav) "♥  Favourite" else "♡  Favourite", onClick = viewModel::toggleFavorite, focusRequester = firstFocus)
-                    if (!person.data.overview.isNullOrBlank()) {
-                        PillButton(if (bioOpen) "Shorter biography" else "Read full biography", onClick = { bioOpen = !bioOpen })
-                    }
                     PillButton("More options", onClick = viewModel::openOriginal)
                 }
             }
         }
-        person.data.overview?.takeIf { it.isNotBlank() }?.let {
-            Text(
-                it,
-                color = Color(0xFFDFE2E6),
-                fontSize = 14.sp,
-                lineHeight = 22.sp,
-                maxLines = if (bioOpen) Int.MAX_VALUE else 5,
-                overflow = TextOverflow.Ellipsis,
-            )
+    }
+}
+
+/** A person's biography, in its own panel under the banner; opens up fully when selected. */
+@Composable
+private fun Biography(bio: String) {
+    var open by remember(bio) { mutableStateOf(false) }
+    SectionTile("Biography") {
+        JeFocusable(onClick = { open = !open }, corner = 14.dp, modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    bio,
+                    color = Color(0xFFDFE2E6),
+                    fontSize = 14.sp,
+                    lineHeight = 22.sp,
+                    maxLines = if (open) Int.MAX_VALUE else 4,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(if (open) "Show less" else "Read more", color = JE.accent2, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
+}
+
+/* ------------------------------------------------------------------
+   Collections: the home page spotlight, cycling through the films in it
+   ------------------------------------------------------------------ */
+@Composable
+private fun CollectionSpotlight(
+    collection: BaseItem,
+    state: JellyeyeInfoState,
+    now: LocalDateTime,
+    firstFocus: FocusRequester,
+    viewModel: JellyeyeInfoViewModel,
+) {
+    val all = state.films
+    if (all.isEmpty()) {
+        // still loading the films: hold the space so the page doesn't jump
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(JeLayout.bannerHeight)
+                .clip(RoundedCornerShape(24.dp))
+                .background(JE.tile)
+                .border(1.dp, JE.line, RoundedCornerShape(24.dp)),
+        )
+        return
+    }
+    // six or fewer: all of them in order; otherwise the ones you haven't seen first
+    val picks =
+        remember(all) {
+            val chosen =
+                if (all.size <= 6) {
+                    all
+                } else {
+                    val (unseen, seen) = all.partition { it.data.userData?.played != true }
+                    (unseen + seen).take(6).sortedBy { all.indexOf(it) }
+                }
+            chosen.map { SpotlightItem(it, it.data.productionYear?.toString() ?: "") }
+        }
+    val ud = collection.data.userData
+    Spotlight(
+        items = picks,
+        now = now,
+        playFocus = firstFocus,
+        onPlay = { viewModel.play(it) },
+        onInfo = viewModel::open,
+        badge = { _, _ -> "Collection · ${collection.name ?: ""} · ${all.size} ${if (all.size == 1) "title" else "titles"}" },
+        extraButtons = {
+            PillButton(if (ud?.isFavorite == true) "♥  Favourite" else "♡  Favourite", onClick = viewModel::toggleFavorite)
+            PillButton(if (ud?.played == true) "✓  Watched" else "Mark watched", onClick = viewModel::toggleWatched)
+            PillButton("More options", onClick = viewModel::openOriginal)
+        },
+    )
 }
 
 @Composable

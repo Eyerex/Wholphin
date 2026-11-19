@@ -567,11 +567,12 @@ fun NavDrawer(
                                 transformOrigin = TransformOrigin(1f, 0.5f)
                             }
                         }.then(
-                            // Jellyeye: the home screen runs edge to edge and keeps its own margin
-                            if (destination is Destination.Home) {
+                            // Jellyeye screens keep their own margins; every other page gets the same
+                            // space on both sides, so nothing sits off-centre
+                            if (isJellyeyeScreen(destination)) {
                                 Modifier
                             } else {
-                                Modifier.padding(start = closedDrawerWidth + 8.dp, end = 16.dp)
+                                Modifier.padding(horizontal = com.github.damontecres.wholphin.ui.jellyeye.JeLayout.pageMargin)
                             },
                         ),
             )
@@ -838,3 +839,18 @@ fun navItemColor(
 val DrawerState.isOpen: Boolean get() = this.currentValue.isOpen
 
 val DrawerValue.isOpen: Boolean get() = this == DrawerValue.Open
+
+/** Screens drawn by Jellyeye itself (they already have the shared margins). */
+private fun isJellyeyeScreen(destination: Destination): Boolean =
+    destination is Destination.Home ||
+        destination is Destination.SeriesOverview ||
+        (
+            destination is Destination.MediaItem &&
+                destination.type in
+                setOf(
+                    org.jellyfin.sdk.model.api.BaseItemKind.MOVIE,
+                    org.jellyfin.sdk.model.api.BaseItemKind.SERIES,
+                    org.jellyfin.sdk.model.api.BaseItemKind.PERSON,
+                    org.jellyfin.sdk.model.api.BaseItemKind.BOX_SET,
+                )
+        )
