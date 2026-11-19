@@ -376,6 +376,7 @@ fun JellyeyeHome(
                         playFocus = playFocus,
                         onPlay = viewModel::play,
                         onInfo = viewModel::open,
+                        onWornOut = viewModel::refreshSpotlight,
                     )
                 }
             }
@@ -405,6 +406,14 @@ fun JellyeyeHome(
                 item(key = "season") {
                     SeasonPanel(season, state.seasonal, onClick = viewModel::open)
                 }
+            } else if (state.gems.isNotEmpty()) {
+                // no holiday right now: the same spot shows highly rated titles you haven't seen
+                item(key = "gems") {
+                    SectionTile("Hidden gems") {
+                        Text("Highly rated in your library, and you haven't watched them yet", color = JE.dim, fontSize = 12.sp)
+                        PosterGrid(state.gems, rows = 2, onClick = viewModel::open)
+                    }
+                }
             }
         }
         }
@@ -415,6 +424,9 @@ fun JellyeyeHome(
    Spotlight: the big rotating card at the top
    ------------------------------------------------------------------ */
 private const val SLIDE_MS = 8_000
+
+// how many times the home banner goes round before it fetches a new set (5 slides x 8s x 3 = about 2 minutes)
+private const val SPOTLIGHT_ROUNDS = 3
 
 @Composable
 internal fun Spotlight(
@@ -428,14 +440,24 @@ internal fun Spotlight(
     badge: (index: Int, count: Int) -> String = { i, n -> "Spotlight ${i + 1} of $n" },
     // extra buttons after Play and More info (a collection adds Favourite, Watched, More options)
     extraButtons: @Composable () -> Unit = {},
+    // called after the banner has gone all the way round a few times (the home page fetches new titles)
+    onWornOut: (() -> Unit)? = null,
 ) {
     var index by remember { mutableIntStateOf(0) }
+    var rounds by remember { mutableIntStateOf(0) }
     if (index >= items.size) index = 0
     val progress = remember { Animatable(0f) }
-    LaunchedEffect(index, items.size) {
+    LaunchedEffect(index, items) {
         progress.snapTo(0f)
         progress.animateTo(1f, tween(SLIDE_MS, easing = LinearEasing))
-        if (items.size > 1) index = (index + 1) % items.size
+        if (items.size > 1) {
+            val next = (index + 1) % items.size
+            if (next == 0 && onWornOut != null && ++rounds >= SPOTLIGHT_ROUNDS) {
+                rounds = 0
+                onWornOut()
+            }
+            index = next
+        }
     }
     val current = items[index]
     val imageUrls = LocalImageUrlService.current

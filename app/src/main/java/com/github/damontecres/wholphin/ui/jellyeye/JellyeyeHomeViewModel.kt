@@ -48,6 +48,8 @@ data class JellyeyeHomeState(
     val recommendedFilms: List<BaseItem> = emptyList(),
     val season: JellyeyeSeason? = null,
     val seasonal: List<BaseItem> = emptyList(),
+    // when there's no holiday: highly rated titles you haven't watched yet
+    val gems: List<BaseItem> = emptyList(),
 )
 
 @HiltViewModel
@@ -63,6 +65,12 @@ class JellyeyeHomeViewModel
         val state: StateFlow<JellyeyeHomeState> = _state
 
         private var lastLoad = 0L
+
+        // kept so the spotlight can be refreshed on its own without reloading the whole page
+        private var lastUserId: UUID? = null
+        private var lastPickUp: List<BaseItem> = emptyList()
+        private var lastSeason: JellyeyeSeason? = null
+        private var lastSeasonal: List<BaseItem> = emptyList()
 
         private val fields =
             listOf(
@@ -183,35 +191,19 @@ class JellyeyeHomeViewModel
                 val showsJob = async { recommended(userId, BaseItemKind.SERIES, continuing) }
                 val filmsJob = async { recommended(userId, BaseItemKind.MOVIE, continuing) }
 
-                val spotlightJob =
+                val gemsJob =
                     async {
-                        val nextUpSeries = pickUp.mapNotNull { it.data.seriesId }.toSet()
-                        items(
-                            GetItemsRequest(
-                                userId = userId,
-                                recursive = true,
-                                includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.SERIES),
-                                sortBy = listOf(ItemSortBy.RANDOM),
-                                imageTypes = listOf(ImageType.BACKDROP),
-                                fields = fields,
-                                limit = 20,
-                                enableUserData = true,
-                            ),
-                        ).filter { !it.data.overview.isNullOrBlank() }
-                            .take(5)
-                            .map { SpotlightItem(it, whyPicked(it, nextUpSeries)) }
+                        if (season != null) emptyList() else gems(userId, continuing)
                     }
 
                 val seasonal = seasonalJob.await()
-                var spotlight = spotlightJob.await()
-                if (season != null) {
-                    val pick = seasonal.firstOrNull { !it.data.backdropImageTags.isNullOrEmpty() && !it.data.overview.isNullOrBlank() }
-                    if (pick != null) {
-                        val days = season.daysLeft()
-                        val why = if (days == 0L) "Seasonal pick · today!" else "Seasonal pick · $days days to ${season.targetName}"
-                        spotlight = listOf(SpotlightItem(pick, why)) + spotlight.filter { it.item.id != pick.id }
-                    }
-                }
+                lastUserId = userId
+                lastPickUp = pickUp
+                lastSeason = season
+                lastSeasonal = seasonal
+                val spotlight = buildSpotlight(userId, pickUp, season, seasonal, exclude = emptySet())
+                // a holiday with nothing for it in the library falls back to the hidden gems too
+                val gems = if (season != null && seasonal.isEmpty()) gems(userId, continuing) else gemsJob.await()
 
                 _state.update {
                     JellyeyeHomeState(
@@ -222,9 +214,79 @@ class JellyeyeHomeViewModel
                         recommendedFilms = filmsJob.await(),
                         season = season,
                         seasonal = seasonal,
+                        gems = gems,
                     )
                 }
             }
+
+        private suspend fun buildSpotlight(
+            userId: UUID,
+            pickUp: List<BaseItem>,
+            season: JellyeyeSeason?,
+            seasonal: List<BaseItem>,
+            exclude: Set<UUID>,
+        ): List<SpotlightItem> {
+            val nextUpSeries = pickUp.mapNotNull { it.data.seriesId }.toSet()
+            var spotlight =
+                items(
+                    GetItemsRequest(
+                        userId = userId,
+                        recursive = true,
+                        includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.SERIES),
+                        sortBy = listOf(ItemSortBy.RANDOM),
+                        imageTypes = listOf(ImageType.BACKDROP),
+                        fields = fields,
+                        limit = 30,
+                        enableUserData = true,
+                    ),
+                ).filter { !it.data.overview.isNullOrBlank() && it.id !in exclude }
+                    .take(5)
+                    .map { SpotlightItem(it, whyPicked(it, nextUpSeries)) }
+            if (season != null) {
+                // a different seasonal pick each time, where there's more than one
+                val picks = seasonal.filter { !it.data.backdropImageTags.isNullOrEmpty() && !it.data.overview.isNullOrBlank() }
+                val pick = picks.firstOrNull { it.id !in exclude } ?: picks.firstOrNull()
+                if (pick != null) {
+                    val days = season.daysLeft()
+                    val why = if (days == 0L) "Seasonal pick · today!" else "Seasonal pick · $days days to ${season.targetName}"
+                    spotlight = listOf(SpotlightItem(pick, why)) + spotlight.filter { it.item.id != pick.id }
+                }
+            }
+            return spotlight
+        }
+
+        /** A fresh set of spotlight titles, different from the ones just shown. Called after the banner has gone round a few times. */
+        fun refreshSpotlight() {
+            val userId = lastUserId ?: return
+            viewModelScope.launchIO {
+                try {
+                    val shown = _state.value.spotlight.map { it.item.id }.toSet()
+                    val fresh = buildSpotlight(userId, lastPickUp, lastSeason, lastSeasonal.shuffled(), exclude = shown)
+                    if (fresh.isNotEmpty()) _state.update { it.copy(spotlight = fresh) }
+                } catch (ex: Exception) {
+                    Timber.w(ex, "Jellyeye: spotlight refresh failed")
+                }
+            }
+        }
+
+        /** Highly rated films and shows you haven't watched yet. */
+        private suspend fun gems(
+            userId: UUID,
+            exclude: Set<UUID>,
+        ): List<BaseItem> =
+            items(
+                GetItemsRequest(
+                    userId = userId,
+                    recursive = true,
+                    includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.SERIES),
+                    filters = listOf(ItemFilter.IS_UNPLAYED),
+                    minCommunityRating = 7.0,
+                    sortBy = listOf(ItemSortBy.RANDOM),
+                    fields = fields,
+                    limit = 40,
+                    enableUserData = true,
+                ),
+            ).filter { it.id !in exclude }
 
         /** Open the normal details page for a title. */
         fun open(item: BaseItem) {
