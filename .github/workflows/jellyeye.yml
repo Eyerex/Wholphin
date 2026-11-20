@@ -38,13 +38,27 @@ jobs:
           # the all-devices APK is the one without a processor name in it
           cp "out/Jellyeye-release-${{ github.run_number }}.apk" out/Jellyeye.apk
           cp out/*armeabi-v7a*.apk out/Jellyeye-firestick.apk
+          # one per processor type, named so the in-app updater can pick the right one (e.g. Jellyeye-armeabi-v7a.apk)
+          for f in out/Jellyeye-release-${{ github.run_number }}-*.apk; do
+            [ -e "$f" ] || continue
+            abi="${f#out/Jellyeye-release-${{ github.run_number }}-}"
+            cp "$f" "out/Jellyeye-$abi"
+          done
+          # only the friendly names go on the release
+          rm -f out/Jellyeye-release-*.apk
+          ls -la out
       - name: Publish to the "latest" release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # the same version the app was built with; the in-app updater compares against it
+          version="$(git describe --tags --long --match='v*')"
           notes="Build ${{ github.run_number }} from $(git rev-parse --short HEAD)
 
-          Fire Stick: install Jellyeye-firestick.apk (smaller) or Jellyeye.apk (works everywhere)."
+          Fire Stick: install Jellyeye-firestick.apk (smaller) or Jellyeye.apk (works everywhere).
+          Already installed? Jellyeye tells you when a new build is out: Settings → Update.
+
+          <!-- jellyeye-version:${version} -->"
           gh release delete latest --yes --cleanup-tag 2>/dev/null || true
-          gh release create latest out/Jellyeye.apk out/Jellyeye-firestick.apk \
+          gh release create latest out/Jellyeye*.apk \
             --title "Jellyeye build ${{ github.run_number }}" --notes "$notes" --target "$(git rev-parse HEAD)" --latest

@@ -162,8 +162,8 @@ configure<ApplicationExtension> {
             dimension = "version"
             isDefault = true
             manifestPlaceholders += mapOf(featureLeanback to false)
-            // Jellyeye: Wholphin's in-app updater would offer to replace Jellyeye with Wholphin, so it's off
-            setFeatureFlag(featureUpdate, false)
+            // Jellyeye: the in-app updater, pointed at Jellyeye's own GitHub releases
+            setFeatureFlag(featureUpdate, true)
             setFeatureFlag(featureDiscover, true)
         }
         create("appstore") {

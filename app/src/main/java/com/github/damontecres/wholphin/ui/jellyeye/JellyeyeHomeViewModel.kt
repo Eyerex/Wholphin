@@ -1,5 +1,11 @@
 package com.github.damontecres.wholphin.ui.jellyeye
 
+import java.io.File
+import org.jellyfin.sdk.model.api.BaseItemDto
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.Serializable
+import dagger.hilt.android.qualifiers.ApplicationContext
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.damontecres.wholphin.data.ServerRepository
@@ -60,6 +66,7 @@ class JellyeyeHomeViewModel
         private val api: ApiClient,
         private val serverRepository: ServerRepository,
         private val latestNextUpService: LatestNextUpService,
+        @param:ApplicationContext private val context: Context,
     ) : ViewModel() {
         private val _state = MutableStateFlow(JellyeyeHomeState())
         val state: StateFlow<JellyeyeHomeState> = _state
@@ -88,6 +95,8 @@ class JellyeyeHomeViewModel
             lastLoad = now
             viewModelScope.launchIO {
                 val userId = serverRepository.currentUser?.id ?: return@launchIO
+                // first time in: show the home page saved last time straight away, then bring it up to date
+                if (!_state.value.loaded) restoreCache(userId)
                 try {
                     load(userId)
                 } catch (ex: Exception) {
@@ -205,10 +214,14 @@ class JellyeyeHomeViewModel
                 // a holiday with nothing for it in the library falls back to the hidden gems too
                 val gems = if (season != null && seasonal.isEmpty()) gems(userId, continuing) else gemsJob.await()
 
+                // just after starting from the saved page, keep the banner that's already showing rather than
+                // swapping it under you; the rest of the page updates in place
+                val keepSpotlight = restoredFromCache && _state.value.spotlight.isNotEmpty()
+                restoredFromCache = false
                 _state.update {
                     JellyeyeHomeState(
                         loaded = true,
-                        spotlight = spotlight,
+                        spotlight = if (keepSpotlight) it.spotlight else spotlight,
                         pickUp = pickUp,
                         recommendedShows = showsJob.await(),
                         recommendedFilms = filmsJob.await(),
@@ -217,7 +230,73 @@ class JellyeyeHomeViewModel
                         gems = gems,
                     )
                 }
+                saveCache(userId, _state.value)
             }
+
+        /* ---------------- the saved home page (instant start) ---------------- */
+
+        private var restoredFromCache = false
+
+        private val cacheJson =
+            Json {
+                ignoreUnknownKeys = true
+            }
+
+        private fun cacheFile(userId: UUID) = File(context.filesDir, "jellyeye-home-$userId.json")
+
+        private fun restoreCache(userId: UUID) {
+            try {
+                val file = cacheFile(userId)
+                if (!file.exists()) return
+                val cache = cacheJson.decodeFromString(JellyeyeHomeCache.serializer(), file.readText())
+                val season = JellyeyeSeason.detect()
+                fun List<BaseItemDto>.items() = map { BaseItem(it, false) }
+                _state.update {
+                    if (it.loaded) {
+                        it
+                    } else {
+                        JellyeyeHomeState(
+                            loaded = true,
+                            spotlight = cache.spotlight.map { s -> SpotlightItem(BaseItem(s.item, false), s.why) },
+                            pickUp = cache.pickUp.items(),
+                            recommendedShows = cache.shows.items(),
+                            recommendedFilms = cache.films.items(),
+                            // the holiday panel only if it's still the same holiday
+                            season = season,
+                            seasonal = if (season != null && season.key == cache.seasonKey) cache.seasonal.items() else emptyList(),
+                            gems = if (season == null) cache.gems.items() else emptyList(),
+                        )
+                    }
+                }
+                restoredFromCache = true
+            } catch (ex: Exception) {
+                Timber.w(ex, "Jellyeye: saved home page couldn't be read")
+            }
+        }
+
+        private fun saveCache(
+            userId: UUID,
+            state: JellyeyeHomeState,
+        ) {
+            try {
+                val cache =
+                    JellyeyeHomeCache(
+                        spotlight = state.spotlight.map { JellyeyeCachedSpot(it.item.data, it.why) },
+                        pickUp = state.pickUp.map { it.data },
+                        shows = state.recommendedShows.map { it.data },
+                        films = state.recommendedFilms.map { it.data },
+                        seasonKey = state.season?.key,
+                        seasonal = state.seasonal.map { it.data },
+                        gems = state.gems.map { it.data },
+                    )
+                val file = cacheFile(userId)
+                val tmp = File(file.parentFile, file.name + ".tmp")
+                tmp.writeText(cacheJson.encodeToString(JellyeyeHomeCache.serializer(), cache))
+                tmp.renameTo(file)
+            } catch (ex: Exception) {
+                Timber.w(ex, "Jellyeye: couldn't save the home page")
+            }
+        }
 
         private suspend fun buildSpotlight(
             userId: UUID,
@@ -408,3 +487,21 @@ class JellyeyeHomeViewModel
             return out
         }
     }
+
+/** What's saved on the stick so the home page can appear instantly next time. */
+@Serializable
+data class JellyeyeHomeCache(
+    val spotlight: List<JellyeyeCachedSpot> = emptyList(),
+    val pickUp: List<BaseItemDto> = emptyList(),
+    val shows: List<BaseItemDto> = emptyList(),
+    val films: List<BaseItemDto> = emptyList(),
+    val seasonKey: String? = null,
+    val seasonal: List<BaseItemDto> = emptyList(),
+    val gems: List<BaseItemDto> = emptyList(),
+)
+
+@Serializable
+data class JellyeyeCachedSpot(
+    val item: BaseItemDto,
+    val why: String,
+)

@@ -32,6 +32,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -151,30 +153,19 @@ fun JellyeyeInfo(
                         top = JeLayout.pageTop,
                         bottom = JeLayout.pageBottom,
                     ),
-                verticalArrangement = Arrangement.spacedBy(JeLayout.panelGap),
+                // no automatic gaps: long grids are drawn as touching pieces, a row at a time,
+                // so every other block adds its own gap (gapItem)
                 modifier = Modifier.fillMaxSize(),
             ) {
                 if (item.type == BaseItemKind.PERSON) {
-                    item(key = "person") { Box(showTop) { PersonHeader(item, state, firstFocus, viewModel) } }
+                    gapItem("person") { Box(showTop) { PersonHeader(item, state, firstFocus, viewModel) } }
                     item.data.overview?.takeIf { it.isNotBlank() }?.let { bio ->
-                        item(key = "bio") { Biography(bio) }
+                        gapItem("bio") { Biography(bio) }
                     }
-                    if (state.films.isNotEmpty()) {
-                        item(key = "films") {
-                            SectionTile("Films in your library · ${state.films.size}") {
-                                PosterGrid(state.films, rows = 50, onClick = viewModel::open, fullRowsOnly = false)
-                            }
-                        }
-                    }
-                    if (state.shows.isNotEmpty()) {
-                        item(key = "shows") {
-                            SectionTile("TV in your library · ${state.shows.size}") {
-                                PosterGrid(state.shows, rows = 50, onClick = viewModel::open, fullRowsOnly = false)
-                            }
-                        }
-                    }
+                    posterSection("films", "Films in your library · ${state.films.size}", state.films, viewModel::open)
+                    posterSection("shows", "TV in your library · ${state.shows.size}", state.shows, viewModel::open)
                 } else {
-                    item(key = "hero") {
+                    gapItem("hero") {
                         Box(showTop) {
                             if (item.type == BaseItemKind.BOX_SET) {
                                 CollectionSpotlight(item, state, now, firstFocus, viewModel)
@@ -183,28 +174,24 @@ fun JellyeyeInfo(
                             }
                         }
                     }
-                    if (hasAbout(item)) item(key = "about") { AboutRow(item) }
-                    if (item.type == BaseItemKind.BOX_SET && state.films.isNotEmpty()) {
-                        item(key = "collection") {
-                            SectionTile("In this collection · ${state.films.size}") {
-                                PosterGrid(state.films, rows = 70, onClick = viewModel::open, fullRowsOnly = false)
-                            }
-                        }
+                    if (hasAbout(item)) gapItem("about") { AboutRow(item) }
+                    if (item.type == BaseItemKind.BOX_SET) {
+                        posterSection("collection", "In this collection · ${state.films.size}", state.films, viewModel::open)
                     }
                     if (item.type == BaseItemKind.SERIES && state.seasons.isNotEmpty()) {
-                        item(key = "episodes") { Episodes(state, now, viewModel) }
+                        episodeSection(state, now, viewModel)
                     }
                     val cast =
                         item.data.people.orEmpty().filter {
                             it.type == PersonKind.ACTOR || it.type == PersonKind.GUEST_STAR
                         }
                     if (cast.isNotEmpty()) {
-                        item(key = "cast") {
+                        gapItem("cast") {
                             SectionTile("Cast") { CastGrid(cast.take(32), onClick = { viewModel.openPerson(it.id) }) }
                         }
                     }
                     if (state.similar.isNotEmpty()) {
-                        item(key = "similar") {
+                        gapItem("similar") {
                             SectionTile("More like this") {
                                 PosterGrid(state.similar, rows = 3, onClick = viewModel::open, fullRowsOnly = false)
                             }
@@ -516,91 +503,101 @@ private fun Label(text: String) {
 /* ------------------------------------------------------------------
    Episodes: season pills, then a list going down the page
    ------------------------------------------------------------------ */
-@Composable
-private fun Episodes(
+/** Season pills, then the episodes one per row (built as you scroll, not all at once). */
+private fun LazyListScope.episodeSection(
     state: JellyeyeInfoState,
     now: LocalDateTime,
     viewModel: JellyeyeInfoViewModel,
 ) {
-    val imageUrls = LocalImageUrlService.current
-    SectionTile("Episodes") {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            state.seasons.forEach { season ->
-                val selected = season.id == state.seasonId
-                JeFocusable(onClick = { viewModel.selectSeason(season.id) }, corner = 20.dp) {
-                    Text(
-                        season.name ?: "",
-                        color = if (selected) JE.accent2 else JE.text,
-                        fontSize = 13.sp,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
-                        modifier =
-                            Modifier
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(if (selected) Color(0x33E5A00D) else Color(0x12FFFFFF))
-                                .padding(horizontal = 14.dp, vertical = 6.dp),
-                    )
-                }
+    item(key = "episodes-top") {
+        PanelTop("Episodes") {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        state.seasons.forEach { season ->
+            val selected = season.id == state.seasonId
+            JeFocusable(onClick = { viewModel.selectSeason(season.id) }, corner = 20.dp) {
+                Text(
+                    season.name ?: "",
+                    color = if (selected) JE.accent2 else JE.text,
+                    fontSize = 13.sp,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+                    modifier =
+                        Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(if (selected) Color(0x33E5A00D) else Color(0x12FFFFFF))
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                )
             }
         }
-        if (state.episodes.isEmpty()) {
-            Text("Loading episodes…", color = JE.dim, fontSize = 13.sp, modifier = Modifier.padding(8.dp))
+    }
+    if (state.episodes.isEmpty()) {
+        Text("Loading episodes…", color = JE.dim, fontSize = 13.sp, modifier = Modifier.padding(8.dp))
+    }
         }
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            state.episodes.forEach { ep ->
-                val isChosen = ep.id == state.chosenEpisodeId
-                val isNext = isChosen || (state.chosenEpisodeId == null && ep.id == state.nextEpisode?.id)
-                val eud = ep.data.userData
-                JeTile(onClick = { viewModel.play(ep) }, modifier = Modifier.fillMaxWidth()) { focused ->
-                    Row(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(if (isNext) Color(0x14E5A00D) else Color(0x08FFFFFF))
-                                .border(1.dp, if (isNext) Color(0x8CE5A00D) else Color.Transparent, RoundedCornerShape(14.dp))
-                                .padding(8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(
-                            Modifier
-                                .coverRing(focused, RoundedCornerShape(15.dp))
-                                .width(150.dp)
-                                .aspectRatio(16f / 9f)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(Color(0xFF2B2E33)),
-                        ) {
-                            val url = remember(ep.id) { imageUrls.getItemImageUrl(ep, ImageType.PRIMARY, fillWidth = 400) }
-                            AsyncImage(model = url, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                            val pct = (eud?.playedPercentage ?: 0.0).toFloat()
-                            if (pct > 0f) {
-                                Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(4.dp).background(Color(0x99000000))) {
-                                    Box(Modifier.fillMaxHeight().fillMaxWidth(pct / 100f).background(JE.accent))
-                                }
-                            }
-                        }
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            Text(
-                                "${ep.data.indexNumber?.let { "$it. " } ?: ""}${ep.name ?: ""}",
-                                color = if (focused) Color.White else JE.text,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            val bits =
-                                listOfNotNull(
-                                    minutesOf(ep.data.runTimeTicks).takeIf { it > 0 }?.let { lengthOf(it) },
-                                    ep.data.premiereDate?.toLocalDate()?.format(DateTimeFormatter.ofPattern("d MMM yyyy", Locale.UK)),
-                                    if (eud?.played == true) "✓ Watched" else null,
-                                    if (isChosen) "Selected" else if (isNext) "Up next" else null,
-                                )
-                            Text(bits.joinToString(" · "), color = if (isNext) JE.accent2 else JE.dim, fontSize = 11.sp)
-                            ep.data.overview?.let {
-                                Text(it, color = JE.soft, fontSize = 12.sp, lineHeight = 17.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            }
-                        }
+    }
+    itemsIndexed(state.episodes, key = { _, ep -> "ep-${ep.id}" }) { _, ep ->
+        PanelRow { EpisodeRow(ep, state, viewModel) }
+    }
+    item(key = "episodes-end") { PanelBottom() }
+}
+
+@Composable
+private fun EpisodeRow(
+    ep: BaseItem,
+    state: JellyeyeInfoState,
+    viewModel: JellyeyeInfoViewModel,
+) {
+    val imageUrls = LocalImageUrlService.current
+    val isChosen = ep.id == state.chosenEpisodeId
+    val isNext = isChosen || (state.chosenEpisodeId == null && ep.id == state.nextEpisode?.id)
+    val eud = ep.data.userData
+    JeTile(onClick = { viewModel.play(ep) }, modifier = Modifier.fillMaxWidth()) { focused ->
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(if (isNext) Color(0x14E5A00D) else Color(0x08FFFFFF))
+                    .border(1.dp, if (isNext) Color(0x8CE5A00D) else Color.Transparent, RoundedCornerShape(14.dp))
+                    .padding(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier
+                    .coverRing(focused, RoundedCornerShape(15.dp))
+                    .width(150.dp)
+                    .aspectRatio(16f / 9f)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFF2B2E33)),
+            ) {
+                val url = remember(ep.id) { imageUrls.getItemImageUrl(ep, ImageType.PRIMARY, fillWidth = 400) }
+                AsyncImage(model = url, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                val pct = (eud?.playedPercentage ?: 0.0).toFloat()
+                if (pct > 0f) {
+                    Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(4.dp).background(Color(0x99000000))) {
+                        Box(Modifier.fillMaxHeight().fillMaxWidth(pct / 100f).background(JE.accent))
                     }
+                }
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(
+                    "${ep.data.indexNumber?.let { "$it. " } ?: ""}${ep.name ?: ""}",
+                    color = if (focused) Color.White else JE.text,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val bits =
+                    listOfNotNull(
+                        minutesOf(ep.data.runTimeTicks).takeIf { it > 0 }?.let { lengthOf(it) },
+                        ep.data.premiereDate?.toLocalDate()?.format(DateTimeFormatter.ofPattern("d MMM yyyy", Locale.UK)),
+                        if (eud?.played == true) "✓ Watched" else null,
+                        if (isChosen) "Selected" else if (isNext) "Up next" else null,
+                    )
+                Text(bits.joinToString(" · "), color = if (isNext) JE.accent2 else JE.dim, fontSize = 11.sp)
+                ep.data.overview?.let {
+                    Text(it, color = JE.soft, fontSize = 12.sp, lineHeight = 17.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
             }
         }

@@ -1,5 +1,16 @@
 package com.github.damontecres.wholphin.ui.jellyeye
 
+import coil3.request.ImageRequest
+import coil3.SingletonImageLoader
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.BringIntoViewSpec
@@ -297,6 +308,98 @@ internal fun SectionTile(
     }
 }
 
+/* ------------------------------------------------------------------
+   Long grids, a row at a time. A panel like SectionTile, but split into pieces (top, one per row,
+   bottom) so the page only builds the rows near the screen instead of every poster at once.
+   ------------------------------------------------------------------ */
+internal enum class PanelPart { Top, Middle, Bottom }
+
+/** Draws this piece of a rounded panel: the top piece gets the rounded top, the bottom piece the rounded bottom. */
+internal fun Modifier.panelPart(part: PanelPart): Modifier =
+    drawBehind {
+        val r = 20.dp.toPx()
+        val stroke = 1.dp.toPx()
+        val extend = r * 2
+        val top = if (part == PanelPart.Top) 0f else -extend
+        val bottom = if (part == PanelPart.Bottom) size.height else size.height + extend
+        clipRect {
+            drawRoundRect(JE.tile, topLeft = Offset(0f, top), size = Size(size.width, bottom - top), cornerRadius = CornerRadius(r))
+            drawRoundRect(
+                JE.line,
+                topLeft = Offset(stroke / 2, top + stroke / 2),
+                size = Size(size.width - stroke, bottom - top - stroke),
+                cornerRadius = CornerRadius(r),
+                style = Stroke(stroke),
+            )
+        }
+    }
+
+/** The top of a split panel: its title (and anything else that sits above the rows). */
+@Composable
+internal fun PanelTop(
+    title: String,
+    content: @Composable () -> Unit = {},
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .panelPart(PanelPart.Top)
+            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(title, color = JE.text, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
+        content()
+    }
+}
+
+/** One row inside a split panel. */
+@Composable
+internal fun PanelRow(content: @Composable () -> Unit) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .panelPart(PanelPart.Middle)
+            .padding(start = 16.dp, end = 16.dp, bottom = 4.dp),
+    ) { content() }
+}
+
+/** The rounded bottom of a split panel, plus the usual gap before the next panel. */
+@Composable
+internal fun PanelBottom() {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .padding(bottom = JeLayout.panelGap)
+            .height(20.dp)
+            .panelPart(PanelPart.Bottom),
+    )
+}
+
+/** A poster grid of any length, built a row at a time. */
+internal fun LazyListScope.posterSection(
+    key: String,
+    title: String,
+    items: List<BaseItem>,
+    onClick: (BaseItem) -> Unit,
+    columns: Int = 8,
+) {
+    if (items.isEmpty()) return
+    val rows = items.chunked(columns)
+    item(key = "$key-top") { PanelTop(title) }
+    itemsIndexed(rows, key = { i, _ -> "$key-row-$i" }) { _, row ->
+        PanelRow { PosterRow(row, columns, onClick) }
+    }
+    item(key = "$key-end") { PanelBottom() }
+}
+
+/** An ordinary panel or block in a list that has split panels in it (those lists have no automatic gaps). */
+internal fun LazyListScope.gapItem(
+    key: String,
+    content: @Composable () -> Unit,
+) {
+    item(key = key) { Box(Modifier.padding(bottom = JeLayout.panelGap)) { content() } }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun JellyeyeHome(
@@ -461,6 +564,17 @@ internal fun Spotlight(
     }
     val current = items[index]
     val imageUrls = LocalImageUrlService.current
+
+    // fetch the next slide's pictures while this one is showing, so the crossfade never waits on the network
+    val context = LocalContext.current
+    LaunchedEffect(index, items) {
+        val next = items.getOrNull((index + 1) % items.size)?.item ?: return@LaunchedEffect
+        val loader = SingletonImageLoader.get(context)
+        listOfNotNull(
+            imageUrls.getItemImageUrl(next, ImageType.BACKDROP, fillWidth = 1280),
+            if (next.data.imageTags?.containsKey(ImageType.LOGO) == true) imageUrls.getItemImageUrl(next, ImageType.LOGO) else null,
+        ).forEach { url -> loader.enqueue(ImageRequest.Builder(context).data(url).build()) }
+    }
 
     // slow "Ken Burns" zoom on the backdrop
     val zoom by rememberInfiniteTransition(label = "kb").animateFloat(
@@ -747,70 +861,79 @@ internal fun PosterGrid(
             (items.size.coerceAtMost(columns * rows) / columns * columns).takeIf { it > 0 } ?: items.size.coerceAtMost(columns)
         }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        items.take(count).chunked(columns).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                row.forEach { item ->
-                    JeTile(onClick = { onClick(item) }, modifier = Modifier.weight(1f)) { focused ->
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Box(
-                                Modifier
-                                    .coverRing(focused)
-                                    .fillMaxWidth()
-                                    .aspectRatio(2f / 3f)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(Color(0xFF2B2E33)),
-                            ) {
-                                val url = remember(item.id) { imageUrls.getItemImageUrl(item, ImageType.PRIMARY, fillWidth = 300) }
-                                AsyncImage(model = url, contentDescription = item.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                                item.data.communityRating?.let {
-                                    Text(
-                                        "★ ${"%.1f".format(it)}",
-                                        color = JE.accent,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier =
-                                            Modifier
-                                                .align(Alignment.BottomEnd)
-                                                .padding(5.dp)
-                                                .clip(RoundedCornerShape(10.dp))
-                                                .background(Color(0xB3000000))
-                                                .padding(horizontal = 6.dp, vertical = 2.dp),
-                                    )
-                                }
-                                if (item.data.userData?.played == true) {
-                                    Text(
-                                        "✓",
-                                        color = JE.onAccent,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        textAlign = TextAlign.Center,
-                                        modifier =
-                                            Modifier
-                                                .align(Alignment.BottomStart)
-                                                .padding(5.dp)
-                                                .size(18.dp)
-                                                .clip(CircleShape)
-                                                .background(JE.accent),
-                                    )
-                                }
-                            }
+        items.take(count).chunked(columns).forEach { row -> PosterRow(row, columns, onClick) }
+    }
+}
+
+/** One row of the poster grid (also used on its own by the long grids, which load a row at a time). */
+@Composable
+internal fun PosterRow(
+    row: List<BaseItem>,
+    columns: Int,
+    onClick: (BaseItem) -> Unit,
+) {
+    val imageUrls = LocalImageUrlService.current
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        row.forEach { item ->
+            JeTile(onClick = { onClick(item) }, modifier = Modifier.weight(1f)) { focused ->
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Box(
+                        Modifier
+                            .coverRing(focused)
+                            .fillMaxWidth()
+                            .aspectRatio(2f / 3f)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color(0xFF2B2E33)),
+                    ) {
+                        val url = remember(item.id) { imageUrls.getItemImageUrl(item, ImageType.PRIMARY, fillWidth = 300) }
+                        AsyncImage(model = url, contentDescription = item.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                        item.data.communityRating?.let {
                             Text(
-                                item.name ?: "",
-                                color = if (focused) Color.White else JE.text,
-                                fontSize = 12.sp,
+                                "★ ${"%.1f".format(it)}",
+                                color = JE.accent,
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(start = 5.dp, top = 2.dp),
+                                modifier =
+                                    Modifier
+                                        .align(Alignment.BottomEnd)
+                                        .padding(5.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(Color(0xB3000000))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp),
                             )
-                            val sub = listOfNotNull(item.data.productionYear?.toString(), lengthText(item)).joinToString(" · ")
-                            Text(sub, color = JE.dim, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 5.dp))
+                        }
+                        if (item.data.userData?.played == true) {
+                            Text(
+                                "✓",
+                                color = JE.onAccent,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                textAlign = TextAlign.Center,
+                                modifier =
+                                    Modifier
+                                        .align(Alignment.BottomStart)
+                                        .padding(5.dp)
+                                        .size(18.dp)
+                                        .clip(CircleShape)
+                                        .background(JE.accent),
+                            )
                         }
                     }
+                    Text(
+                        item.name ?: "",
+                        color = if (focused) Color.White else JE.text,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(start = 5.dp, top = 2.dp),
+                    )
+                    val sub = listOfNotNull(item.data.productionYear?.toString(), lengthText(item)).joinToString(" · ")
+                    Text(sub, color = JE.dim, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 5.dp))
                 }
-                repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
+        repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
     }
 }
 

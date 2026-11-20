@@ -57,7 +57,13 @@ class UpdateChecker
         @param:StandardOkHttpClient private val okHttpClient: OkHttpClient,
     ) {
         companion object {
-            const val ASSET_NAME = "Wholphin"
+            // Jellyeye: its own releases on GitHub (the build on the "latest" release)
+            const val ASSET_NAME = "Jellyeye"
+            const val JELLYEYE_UPDATE_URL = "https://api.github.com/repos/Eyerex/wholphin/releases/tags/latest"
+            private val JELLYEYE_VERSION_REGEX = Regex("<!-- jellyeye-version:\\s*(\\S+)\\s*-->")
+
+            /** Older settings may still hold Wholphin's address: always look at Jellyeye's own releases. */
+            fun jellyeyeUrl(url: String?): String = if (url.isNullOrBlank() || url.contains("damontecres", ignoreCase = true)) JELLYEYE_UPDATE_URL else url
             const val APK_NAME = "$ASSET_NAME.apk"
 
             private const val APK_MIME_TYPE = "application/vnd.android.package-archive"
@@ -103,7 +109,7 @@ class UpdateChecker
                 } else {
                     showToast(
                         context,
-                        "Update available: $installedVersion => ${latestRelease.version}!",
+                        "A new Jellyeye build is ready: Settings → Update to install it",
                         Toast.LENGTH_LONG,
                     )
                 }
@@ -112,7 +118,7 @@ class UpdateChecker
                 if (showNegativeToast) {
                     showToast(
                         context,
-                        "No updates available, $installedVersion is the latest!",
+                        "Jellyeye is up to date",
                         Toast.LENGTH_LONG,
                     )
                 }
@@ -127,19 +133,7 @@ class UpdateChecker
             return Version.fromString(pkgInfo.versionName!!)
         }
 
-        suspend fun getRelease(version: Version): Release? {
-            val url =
-                "https://api.github.com/repos/damontecres/Wholphin/releases/tags/v${version.major}.${version.minor}.${version.patch}"
-            return withContext(WholphinDispatchers.IO) {
-                val request =
-                    Request
-                        .Builder()
-                        .url(url)
-                        .get()
-                        .build()
-                getRelease(request)
-            }
-        }
+        suspend fun getRelease(version: Version): Release? = getLatestRelease(JELLYEYE_UPDATE_URL)?.takeIf { it.version == version }
 
         /**
          * Get the latest released version
@@ -149,7 +143,7 @@ class UpdateChecker
                 val request =
                     Request
                         .Builder()
-                        .url(updateUrl)
+                        .url(jellyeyeUrl(updateUrl))
                         .get()
                         .build()
                 getRelease(request)
@@ -160,10 +154,13 @@ class UpdateChecker
                 if (it.isSuccessful) {
                     val result = Json.parseToJsonElement(it.body.string())
                     val name = result.jsonObject["name"]?.jsonPrimitive?.contentOrNull
-                    val version = Version.tryFromString(name)
                     val publishedAt =
                         result.jsonObject["published_at"]?.jsonPrimitive?.contentOrNull
                     val body = result.jsonObject["body"]?.jsonPrimitive?.contentOrNull
+                    // Jellyeye releases carry the build's version in a hidden line of the notes
+                    val version =
+                        body?.let { b -> JELLYEYE_VERSION_REGEX.find(b)?.groupValues?.get(1) }?.let { Version.tryFromString(it) }
+                            ?: Version.tryFromString(name)
                     val downloadUrl =
                         result.jsonObject["assets"]
                             ?.jsonArray
