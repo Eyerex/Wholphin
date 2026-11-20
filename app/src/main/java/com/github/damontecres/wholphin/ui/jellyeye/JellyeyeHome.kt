@@ -576,14 +576,6 @@ internal fun Spotlight(
         ).forEach { url -> loader.enqueue(ImageRequest.Builder(context).data(url).build()) }
     }
 
-    // slow "Ken Burns" zoom on the backdrop
-    val zoom by rememberInfiniteTransition(label = "kb").animateFloat(
-        initialValue = 1f,
-        targetValue = 1.08f,
-        animationSpec = infiniteRepeatable(tween(20_000, easing = LinearEasing), RepeatMode.Reverse),
-        label = "kbZoom",
-    )
-
     Box(
         modifier =
             modifier
@@ -594,6 +586,9 @@ internal fun Spotlight(
                 .border(1.dp, JE.line, RoundedCornerShape(24.dp)),
     ) {
         Crossfade(targetState = current.item, label = "spotlightBg") { item ->
+            // slow push-in: every slide starts at normal size and zooms in gently while it's on screen
+            val zoom = remember(item.id) { Animatable(1f) }
+            LaunchedEffect(item.id) { zoom.animateTo(1.06f, tween(SLIDE_MS + 1_000, easing = LinearEasing)) }
             val backdrop = remember(item.id) { imageUrls.getItemImageUrl(item, ImageType.BACKDROP, fillWidth = 1280) }
             AsyncImage(
                 model = backdrop,
@@ -603,8 +598,8 @@ internal fun Spotlight(
                     Modifier
                         .fillMaxSize()
                         .graphicsLayer {
-                            scaleX = zoom
-                            scaleY = zoom
+                            scaleX = zoom.value
+                            scaleY = zoom.value
                         },
             )
         }
