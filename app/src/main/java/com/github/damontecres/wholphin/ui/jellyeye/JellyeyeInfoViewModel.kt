@@ -63,6 +63,8 @@ data class JellyeyeInfoState(
     // for the options pop-up: saved audio/subtitle/version choices, and whether delete is allowed
     val chosenStreams: ChosenStreams? = null,
     val canDelete: Boolean = false,
+    // collections: a film series (kept in release order) or a themed mix (random banner, A-Z grid)
+    val collectionInOrder: Boolean = true,
 )
 
 @HiltViewModel
@@ -150,21 +152,51 @@ class JellyeyeInfoViewModel
         /** A collection: everything in it, oldest first, shown as a grid going down. */
         private suspend fun loadCollection(itemId: UUID) {
             val children =
-                    api.libraryApi
-                        .getItems(
-                            GetItemsRequest(
-                                userId = serverRepository.currentUser?.id,
-                                parentId = itemId,
-                                fields = rowFields,
-                                sortBy = listOf(ItemSortBy.PREMIERE_DATE, ItemSortBy.PRODUCTION_YEAR, ItemSortBy.SORT_NAME),
-                                sortOrder = listOf(SortOrder.ASCENDING, SortOrder.ASCENDING, SortOrder.ASCENDING),
-                                enableUserData = true,
-                                limit = 500,
-                            ),
-                        ).content
-                        .items
-                        .map { BaseItem(it, false) }
-                _state.update { it.copy(films = children) }
+                api.libraryApi
+                    .getItems(
+                        GetItemsRequest(
+                            userId = serverRepository.currentUser?.id,
+                            parentId = itemId,
+                            fields = rowFields + ItemFields.PROVIDER_IDS + ItemFields.SORT_NAME,
+                            sortBy = listOf(ItemSortBy.PREMIERE_DATE, ItemSortBy.PRODUCTION_YEAR, ItemSortBy.SORT_NAME),
+                            sortOrder = listOf(SortOrder.ASCENDING, SortOrder.ASCENDING, SortOrder.ASCENDING),
+                            enableUserData = true,
+                            limit = 500,
+                        ),
+                    ).content
+                    .items
+                    .map { BaseItem(it, false) }
+            val inOrder = isFilmSeries(_state.value.item, children)
+            val films = if (inOrder) children else children.sortedBy { (it.data.sortName ?: it.name ?: "").lowercase() }
+            _state.update { it.copy(films = films, collectionInOrder = inOrder) }
+        }
+
+        /**
+         * Is this collection a film series (keep release order) or a themed mix (random banner, A-Z grid)?
+         * 1. a "shuffle" or "in order" tag on the collection always wins;
+         * 2. otherwise, if half or more of the films belong to the same film series (as recorded by
+         *    Jellyfin's film details), it's a series;
+         * 3. with no series information, 12 titles or fewer count as a series, bigger ones as a mix.
+         */
+        private fun isFilmSeries(
+            collection: BaseItem?,
+            films: List<BaseItem>,
+        ): Boolean {
+            val tags = collection?.data?.tags.orEmpty().map { it.trim().lowercase() }
+            if (tags.any { it == "shuffle" || it == "random" || it == "shuffled" }) return false
+            if (tags.any { it == "in order" || it == "inorder" || it == "ordered" || it == "in-order" }) return true
+            val seriesIds =
+                films.mapNotNull { f ->
+                    f.data.providerIds
+                        ?.entries
+                        ?.firstOrNull { it.key.equals("TmdbCollection", ignoreCase = true) && !it.value.isNullOrBlank() }
+                        ?.value
+                }
+            if (seriesIds.isNotEmpty()) {
+                val biggest = seriesIds.groupingBy { it }.eachCount().values.max()
+                return biggest * 2 >= films.size
+            }
+            return films.size <= 12
         }
 
         private suspend fun similar(itemId: UUID): List<BaseItem> =

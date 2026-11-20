@@ -41,6 +41,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -772,16 +773,24 @@ private fun CollectionSpotlight(
         )
         return
     }
-    // six or fewer: all of them in order; otherwise the ones you haven't seen first
+    // a new random set for a themed collection each time it wears out (and each time the page is opened)
+    var round by remember { mutableIntStateOf(0) }
+    // the titles on the banner right now (a plain holder, not state: it only steers the next pick)
+    val shown = remember { mutableListOf<UUID>() }
     val picks =
-        remember(all) {
+        remember(all, state.collectionInOrder, round) {
+            val (unseen, seen) = all.partition { it.data.userData?.played != true }
             val chosen =
-                if (all.size <= 6) {
-                    all
+                if (state.collectionInOrder) {
+                    // a film series: up to six, unwatched first, shown in release order
+                    if (all.size <= 6) all else (unseen + seen).take(6).sortedBy { all.indexOf(it) }
                 } else {
-                    val (unseen, seen) = all.partition { it.data.userData?.played != true }
-                    (unseen + seen).take(6).sortedBy { all.indexOf(it) }
+                    // a themed mix: six at random, unwatched first, avoiding the ones just shown where possible
+                    val fresh = { list: List<BaseItem> -> list.filter { it.id !in shown }.shuffled() + list.filter { it.id in shown }.shuffled() }
+                    (fresh(unseen) + fresh(seen)).take(6)
                 }
+            shown.clear()
+            shown.addAll(chosen.map { it.id })
             chosen.map { SpotlightItem(it, it.data.productionYear?.toString() ?: "") }
         }
     val ud = collection.data.userData
@@ -792,6 +801,7 @@ private fun CollectionSpotlight(
         onPlay = { viewModel.play(it) },
         onInfo = viewModel::open,
         badge = { _, _ -> "Collection · ${collection.name ?: ""} · ${all.size} ${if (all.size == 1) "title" else "titles"}" },
+        onWornOut = if (state.collectionInOrder || all.size <= 6) null else ({ round++ }),
         extraButtons = {
             // the whole collection: every film back to back in release order, or shuffled
             PillButton("▶▶  Play all", onClick = { viewModel.playCollection(shuffle = false) })
