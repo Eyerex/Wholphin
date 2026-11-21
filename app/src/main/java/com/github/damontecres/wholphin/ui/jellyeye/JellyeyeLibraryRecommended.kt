@@ -535,7 +535,9 @@ fun JellyeyeLibraryRecommended(
                     .fillMaxSize()
                     .focusProperties {
                         onEnter = {
-                            if (requestedFocusDirection == FocusDirection.Down || requestedFocusDirection == FocusDirection.Enter) {
+                            // only when you press Down from the tabs (focus put on a title by the page itself, e.g.
+                            // coming back to the one you opened, must not be redirected)
+                            if (requestedFocusDirection == FocusDirection.Down) {
                                 if (listState.firstVisibleItemIndex == 0) firstTile.tryRequestFocus()
                             }
                         }
