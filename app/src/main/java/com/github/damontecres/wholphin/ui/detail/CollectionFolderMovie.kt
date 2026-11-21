@@ -56,12 +56,10 @@ fun CollectionFolderMovie(
         when (tabIndex) {
             // Recommended
             0 -> {
-                RecommendedMovie(
-                    preferences = preferences,
-                    parentId = destination.itemId,
-                    onFocusPosition = { pos ->
-                        showHeader = pos.row < 1
-                    },
+                // Jellyeye: recommendations worked out from what you watch, in the home-page look
+                com.github.damontecres.wholphin.ui.jellyeye.JellyeyeLibraryRecommended(
+                    libraryId = destination.itemId,
+                    kind = org.jellyfin.sdk.model.api.BaseItemKind.MOVIE,
                     modifier =
                         Modifier
                             .fillMaxSize()
