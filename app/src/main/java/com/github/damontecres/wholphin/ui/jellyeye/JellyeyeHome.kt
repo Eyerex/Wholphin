@@ -911,7 +911,6 @@ internal fun PosterGrid(
     fullRowsOnly: Boolean = true,
     focusRequesters: Map<UUID, FocusRequester> = emptyMap(),
 ) {
-    val imageUrls = LocalImageUrlService.current
     // only complete rows, like the web version (unless every title should be shown, e.g. an actor's films)
     val count =
         if (!fullRowsOnly) {

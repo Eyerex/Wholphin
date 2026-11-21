@@ -138,8 +138,21 @@ object JePageFocus {
         if (current === target) current = null
     }
 
-    /** Hand focus back to the page; false if no Jellyeye page is showing (the menu then behaves as normal). */
-    fun takeBack(): Boolean = current?.focusNow() == true
+    /** Is a Jellyeye page on screen to hand focus back to? */
+    val hasPage: Boolean get() = current != null
+
+    /**
+     * Hand stray focus back to the page, trying for a moment while it finishes drawing. False if there's no
+     * Jellyeye page, or it never became ready (the menu then opens as normal, so focus is never stuck).
+     */
+    suspend fun takeBack(): Boolean {
+        repeat(25) {
+            val page = current ?: return false
+            if (page.focusNow()) return true
+            delay(40)
+        }
+        return false
+    }
 }
 
 /** Remembers when Left or Back was last pressed, so the menu can tell being opened on purpose from stray focus. */
