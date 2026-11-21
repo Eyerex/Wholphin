@@ -468,6 +468,15 @@ fun JellyeyeLibraryRecommended(
     // pressing Down from the tabs always lands on the first title of the first panel
     val firstTile = remember { FocusRequester() }
     val listState = rememberLazyListState()
+    // like Wholphin's own Recommended page: once the panels are there, put focus on the first title, so the
+    // page doesn't open with nothing selected (which made Down do nothing until you'd moved along the tabs)
+    val hasSections = state.loaded && state.sections.isNotEmpty()
+    LaunchedEffect(hasSections) {
+        if (hasSections) {
+            delay(100)
+            firstTile.tryRequestFocus()
+        }
+    }
     CompositionLocalProvider(LocalBringIntoViewSpec provides JellyeyeScrollSpec) {
         LazyColumn(
             state = listState,
