@@ -113,9 +113,19 @@ class JellyeyeRecommendedViewModel
             }
         }
 
-        fun open(item: BaseItem) = navigationManager.navigateTo(item.destination())
+        /** The title you last opened from here, so coming back lands on it again. */
+        var lastOpened: UUID? = null
+            private set
 
-        fun play(item: BaseItem) = navigationManager.navigateTo(Destination.Playback(item))
+        fun open(item: BaseItem) {
+            lastOpened = item.id
+            navigationManager.navigateTo(item.destination())
+        }
+
+        fun play(item: BaseItem) {
+            lastOpened = item.id
+            navigationManager.navigateTo(Destination.Playback(item))
+        }
 
         /* ---------------- helpers ---------------- */
 
@@ -468,12 +478,37 @@ fun JellyeyeLibraryRecommended(
     // pressing Down from the tabs always lands on the first title of the first panel
     val firstTile = remember { FocusRequester() }
     val listState = rememberLazyListState()
-    // like Wholphin's own Recommended page: once the panels are there, put focus on the first title, so the
-    // page doesn't open with nothing selected (which made Down do nothing until you'd moved along the tabs)
-    val hasSections = state.loaded && state.sections.isNotEmpty()
-    LaunchedEffect(hasSections) {
+    val restoreTile = remember { FocusRequester() }
+    val sections =
+        if (JeSettings.showBecauseYouWatched) state.sections else state.sections.filterNot { it.key.startsWith("because-") }
+    // the titles actually on screen in each panel (wide panels show 10, poster panels 16)
+    val onScreen = remember(sections) { sections.flatMap { s -> s.items.take(if (s.wide) 10 else 16).map { it.id } }.toSet() }
+    val firstId = sections.firstOrNull()?.items?.firstOrNull()?.id
+    val backTo = viewModel.lastOpened?.takeIf { it in onScreen && it != firstId }
+    val focusMap =
+        remember(firstId, backTo) {
+            buildMap {
+                firstId?.let { put(it, firstTile) }
+                backTo?.let { put(it, restoreTile) }
+            }
+        }
+    // when the page opens, select the first title; coming back from a title, select that title again.
+    // Keeps trying for a moment while the panels finish appearing, so focus is never left with nothing
+    // (which let the side menu catch it and open)
+    val hasSections = state.loaded && sections.isNotEmpty()
+    LaunchedEffect(hasSections, backTo) {
         if (hasSections) {
-            delay(100)
+            val target = if (backTo != null) restoreTile else firstTile
+            // make sure the panel holding that title is on screen (it may be further down the page)
+            if (backTo != null) {
+                val panel = sections.indexOfFirst { s -> s.items.any { it.id == backTo } }
+                val visible = listState.layoutInfo.visibleItemsInfo.map { it.index }
+                if (panel >= 0 && panel !in visible) listState.scrollToItem(panel)
+            }
+            repeat(30) {
+                if (target.tryRequestFocus()) return@LaunchedEffect
+                delay(50)
+            }
             firstTile.tryRequestFocus()
         }
     }
@@ -507,15 +542,12 @@ fun JellyeyeLibraryRecommended(
                     }
                 }
             }
-            val sections =
-                if (JeSettings.showBecauseYouWatched) state.sections else state.sections.filterNot { it.key.startsWith("because-") }
-            itemsIndexed(sections, key = { _, s -> s.key }) { index, s ->
-                val focus = if (index == 0) firstTile else null
+            itemsIndexed(sections, key = { _, s -> s.key }) { _, s ->
                 SectionTile(s.title) {
                     if (s.wide) {
-                        WideGrid(s.items, now, onClick = viewModel::play, firstFocus = focus)
+                        WideGrid(s.items, now, onClick = viewModel::play, focusRequesters = focusMap)
                     } else {
-                        PosterGrid(s.items, rows = 2, onClick = viewModel::open, fullRowsOnly = false, firstFocus = focus)
+                        PosterGrid(s.items, rows = 2, onClick = viewModel::open, fullRowsOnly = false, focusRequesters = focusMap)
                     }
                 }
             }

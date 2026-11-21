@@ -1,5 +1,6 @@
 package com.github.damontecres.wholphin.ui.jellyeye
 
+import java.util.UUID
 import androidx.compose.runtime.MutableState
 import com.github.damontecres.wholphin.preferences.JellyeyePreferences
 import com.github.damontecres.wholphin.preferences.AppThemeColors
@@ -790,7 +791,7 @@ internal fun WideGrid(
     items: List<BaseItem>,
     now: LocalDateTime,
     onClick: (BaseItem) -> Unit,
-    firstFocus: FocusRequester? = null,
+    focusRequesters: Map<UUID, FocusRequester> = emptyMap(),
 ) {
     val imageUrls = LocalImageUrlService.current
     val columns = 5
@@ -798,7 +799,7 @@ internal fun WideGrid(
         items.take(columns * 2).chunked(columns).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 row.forEach { item ->
-                    JeTile(onClick = { onClick(item) }, modifier = Modifier.weight(1f), focusRequester = if (item === items.first()) firstFocus else null) { focused ->
+                    JeTile(onClick = { onClick(item) }, modifier = Modifier.weight(1f), focusRequester = focusRequesters[item.id]) { focused ->
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Box(
                                 Modifier
@@ -883,7 +884,7 @@ internal fun PosterGrid(
     onClick: (BaseItem) -> Unit,
     columns: Int = 8,
     fullRowsOnly: Boolean = true,
-    firstFocus: FocusRequester? = null,
+    focusRequesters: Map<UUID, FocusRequester> = emptyMap(),
 ) {
     val imageUrls = LocalImageUrlService.current
     // only complete rows, like the web version (unless every title should be shown, e.g. an actor's films)
@@ -894,7 +895,7 @@ internal fun PosterGrid(
             (items.size.coerceAtMost(columns * rows) / columns * columns).takeIf { it > 0 } ?: items.size.coerceAtMost(columns)
         }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        items.take(count).chunked(columns).forEachIndexed { i, row -> PosterRow(row, columns, onClick, if (i == 0) firstFocus else null) }
+        items.take(count).chunked(columns).forEach { row -> PosterRow(row, columns, onClick, focusRequesters) }
     }
 }
 
@@ -904,12 +905,12 @@ internal fun PosterRow(
     row: List<BaseItem>,
     columns: Int,
     onClick: (BaseItem) -> Unit,
-    firstFocus: FocusRequester? = null,
+    focusRequesters: Map<UUID, FocusRequester> = emptyMap(),
 ) {
     val imageUrls = LocalImageUrlService.current
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         row.forEach { item ->
-            JeTile(onClick = { onClick(item) }, modifier = Modifier.weight(1f), focusRequester = if (item === row.first()) firstFocus else null) { focused ->
+            JeTile(onClick = { onClick(item) }, modifier = Modifier.weight(1f), focusRequester = focusRequesters[item.id]) { focused ->
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Box(
                         Modifier
