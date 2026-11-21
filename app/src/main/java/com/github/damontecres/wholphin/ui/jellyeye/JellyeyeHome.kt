@@ -1,5 +1,12 @@
 package com.github.damontecres.wholphin.ui.jellyeye
 
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.runtime.staticCompositionLocalOf
 import java.util.UUID
 import androidx.compose.runtime.MutableState
 import com.github.damontecres.wholphin.preferences.JellyeyePreferences
@@ -121,6 +128,15 @@ internal object JellyeyeScrollSpec : BringIntoViewSpec {
 }
 
 /** Jellyeye colours: the same palette as the web design. */
+/** The side menu's focus target (the selected menu item). Left from the first title in a row goes straight to it. */
+val LocalMenuFocus = staticCompositionLocalOf<FocusRequester?> { null }
+
+/** Left (on the first title of a row, or the first button) goes into the side menu; if that can't happen, Left works as usual. */
+internal fun Modifier.leftOpensMenu(menu: FocusRequester): Modifier =
+    onPreviewKeyEvent { e ->
+        e.type == KeyEventType.KeyDown && e.key == Key.DirectionLeft && menu.tryRequestFocus()
+    }
+
 /** One Jellyeye colour set per Wholphin colour theme (vivid versions, so rings and buttons stay punchy). */
 data class JePalette(
     val accent: Color,
@@ -220,16 +236,19 @@ fun JeFocusable(
     modifier: Modifier = Modifier,
     corner: Dp = 14.dp,
     focusRequester: FocusRequester? = null,
+    leftEdge: Boolean = false,
     content: @Composable BoxScope.(focused: Boolean) -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
+    val menu = if (leftEdge) LocalMenuFocus.current else null
     Box(
         modifier =
             modifier
                 .border(3.dp, if (focused) JE.accent else Color.Transparent, RoundedCornerShape(corner + 5.dp))
                 .padding(5.dp)
                 .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+                .then(if (menu != null) Modifier.leftOpensMenu(menu) else Modifier)
                 .clickable(interactionSource = interaction, indication = null, onClick = onClick),
     ) {
         content(focused)
@@ -245,14 +264,17 @@ internal fun JeTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     focusRequester: FocusRequester? = null,
+    leftEdge: Boolean = false,
     content: @Composable (focused: Boolean) -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
+    val menu = if (leftEdge) LocalMenuFocus.current else null
     Column(
         modifier =
             modifier
                 .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+                .then(if (menu != null) Modifier.leftOpensMenu(menu) else Modifier)
                 .clickable(interactionSource = interaction, indication = null, onClick = onClick),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
@@ -275,8 +297,9 @@ internal fun PillButton(
     onClick: () -> Unit,
     primary: Boolean = false,
     focusRequester: FocusRequester? = null,
+    leftEdge: Boolean = false,
 ) {
-    JeFocusable(onClick = onClick, corner = 30.dp, focusRequester = focusRequester) {
+    JeFocusable(onClick = onClick, corner = 30.dp, focusRequester = focusRequester, leftEdge = leftEdge) {
         Text(
             text = text,
             color = if (primary) JE.onAccent else Color.White,
@@ -733,7 +756,7 @@ internal fun Spotlight(
                 verticalArrangement = Arrangement.spacedBy(2.dp),
                 itemVerticalAlignment = Alignment.CenterVertically,
             ) {
-                PillButton("▶  Play", onClick = { onPlay(item) }, primary = true, focusRequester = playFocus)
+                PillButton("▶  Play", onClick = { onPlay(item) }, primary = true, focusRequester = playFocus, leftEdge = true)
                 PillButton("ⓘ  More info", onClick = { onInfo(item) })
                 extraButtons()
             }
@@ -743,7 +766,7 @@ internal fun Spotlight(
             // the row of spotlight titles, with a bar showing when the next one comes up
             Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.fillMaxWidth()) {
                 items.forEachIndexed { i, s ->
-                    JeFocusable(onClick = { index = i }, corner = 12.dp, modifier = Modifier.weight(1f)) {
+                    JeFocusable(onClick = { index = i }, corner = 12.dp, modifier = Modifier.weight(1f), leftEdge = i == 0) {
                         Column(
                             modifier =
                                 Modifier
@@ -799,7 +822,7 @@ internal fun WideGrid(
         items.take(columns * 2).chunked(columns).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 row.forEach { item ->
-                    JeTile(onClick = { onClick(item) }, modifier = Modifier.weight(1f), focusRequester = focusRequesters[item.id]) { focused ->
+                    JeTile(onClick = { onClick(item) }, modifier = Modifier.weight(1f), focusRequester = focusRequesters[item.id], leftEdge = item === row.first()) { focused ->
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Box(
                                 Modifier
@@ -910,7 +933,7 @@ internal fun PosterRow(
     val imageUrls = LocalImageUrlService.current
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         row.forEach { item ->
-            JeTile(onClick = { onClick(item) }, modifier = Modifier.weight(1f), focusRequester = focusRequesters[item.id]) { focused ->
+            JeTile(onClick = { onClick(item) }, modifier = Modifier.weight(1f), focusRequester = focusRequesters[item.id], leftEdge = item === row.first()) { focused ->
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Box(
                         Modifier

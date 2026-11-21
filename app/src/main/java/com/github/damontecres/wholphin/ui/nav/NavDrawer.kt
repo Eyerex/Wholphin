@@ -1,5 +1,6 @@
 package com.github.damontecres.wholphin.ui.nav
 
+import androidx.compose.runtime.CompositionLocalProvider
 import com.github.damontecres.wholphin.ui.jellyeye.JE
 import android.content.Context
 import androidx.activity.compose.BackHandler
@@ -550,33 +551,36 @@ fun NavDrawer(
             modifier = Modifier.fillMaxSize(),
         ) {
             // Drawer content
-            DestinationContent(
-                destination = destination,
-                preferences = preferences,
-                onClearBackdrop = onClearBackdrop,
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        // Jellyeye: instead of sliding the page off the right of the screen when the menu
-                        // opens, shrink the whole page so it all stays in view beside the menu
-                        .graphicsLayer {
-                            val room = offset.x.toFloat()
-                            if (size.width > 0f && room > 0f) {
-                                val s = ((size.width - room) / size.width).coerceIn(0.5f, 1f)
-                                scaleX = s
-                                scaleY = s
-                                transformOrigin = TransformOrigin(1f, 0.5f)
-                            }
-                        }.then(
-                            // Jellyeye screens keep their own margins; every other page gets the same
-                            // space on both sides, so nothing sits off-centre
-                            if (isJellyeyeScreen(destination)) {
-                                Modifier
-                            } else {
-                                Modifier.padding(horizontal = com.github.damontecres.wholphin.ui.jellyeye.JeLayout.pageMargin)
-                            },
-                        ),
-            )
+            // (Jellyeye: its screens get the menu's focus target, so Left from the first title opens the menu)
+            CompositionLocalProvider(com.github.damontecres.wholphin.ui.jellyeye.LocalMenuFocus provides focusRequester) {
+                DestinationContent(
+                    destination = destination,
+                    preferences = preferences,
+                    onClearBackdrop = onClearBackdrop,
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            // Jellyeye: instead of sliding the page off the right of the screen when the menu
+                            // opens, shrink the whole page so it all stays in view beside the menu
+                            .graphicsLayer {
+                                val room = offset.x.toFloat()
+                                if (size.width > 0f && room > 0f) {
+                                    val s = ((size.width - room) / size.width).coerceIn(0.5f, 1f)
+                                    scaleX = s
+                                    scaleY = s
+                                    transformOrigin = TransformOrigin(1f, 0.5f)
+                                }
+                            }.then(
+                                // Jellyeye screens keep their own margins; every other page gets the same
+                                // space on both sides, so nothing sits off-centre
+                                if (isJellyeyeScreen(destination)) {
+                                    Modifier
+                                } else {
+                                    Modifier.padding(horizontal = com.github.damontecres.wholphin.ui.jellyeye.JeLayout.pageMargin)
+                                },
+                            ),
+                )
+            }
             if (preferences.appPreferences.interfacePreferences.showClock) {
                 TimeDisplay()
             }

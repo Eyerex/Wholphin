@@ -320,7 +320,7 @@ private fun InfoHeader(
             }
             // buttons drop onto a second line rather than squashing when there isn't room
             FlowRow(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                PillButton("▶  $playLabel", onClick = { (target ?: item).let { viewModel.play(it) } }, primary = true, focusRequester = firstFocus)
+                PillButton("▶  $playLabel", onClick = { (target ?: item).let { viewModel.play(it) } }, primary = true, focusRequester = firstFocus, leftEdge = true)
                 if (resumeMs > 0 && target != null) {
                     PillButton("From the start", onClick = { viewModel.play(target, fromStart = true) })
                 }
@@ -507,7 +507,7 @@ private fun LazyListScope.episodeSection(
     FlowRow(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         state.seasons.forEach { season ->
             val selected = season.id == state.seasonId
-            JeFocusable(onClick = { viewModel.selectSeason(season.id) }, corner = 20.dp) {
+            JeFocusable(onClick = { viewModel.selectSeason(season.id) }, corner = 20.dp, leftEdge = season === state.seasons.first()) {
                 Text(
                     season.name ?: "",
                     color = if (selected) JE.accent2 else JE.text,
@@ -543,7 +543,7 @@ private fun EpisodeRow(
     val isChosen = ep.id == state.chosenEpisodeId
     val isNext = isChosen || (state.chosenEpisodeId == null && ep.id == state.nextEpisode?.id)
     val eud = ep.data.userData
-    JeTile(onClick = { viewModel.play(ep) }, modifier = Modifier.fillMaxWidth()) { focused ->
+    JeTile(onClick = { viewModel.play(ep) }, modifier = Modifier.fillMaxWidth(), leftEdge = true) { focused ->
         Row(
             modifier =
                 Modifier
@@ -611,7 +611,7 @@ private fun CastGrid(
         cast.chunked(columns).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 row.forEach { person ->
-                    JeTile(onClick = { onClick(person) }, modifier = Modifier.weight(1f)) { focused ->
+                    JeTile(onClick = { onClick(person) }, modifier = Modifier.weight(1f), leftEdge = person === row.first()) { focused ->
                         Column(
                             Modifier.fillMaxWidth().padding(vertical = 4.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -722,7 +722,7 @@ private fun PersonHeader(
                 }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     val fav = person.data.userData?.isFavorite == true
-                    PillButton(if (fav) "♥  Favourite" else "♡  Favourite", onClick = viewModel::toggleFavorite, focusRequester = firstFocus)
+                    PillButton(if (fav) "♥  Favourite" else "♡  Favourite", onClick = viewModel::toggleFavorite, focusRequester = firstFocus, leftEdge = true)
                 }
             }
         }
@@ -734,7 +734,7 @@ private fun PersonHeader(
 private fun Biography(bio: String) {
     var open by remember(bio) { mutableStateOf(false) }
     SectionTile("Biography") {
-        JeFocusable(onClick = { open = !open }, corner = 14.dp, modifier = Modifier.fillMaxWidth()) {
+        JeFocusable(onClick = { open = !open }, corner = 14.dp, modifier = Modifier.fillMaxWidth(), leftEdge = true) {
             Column(Modifier.padding(4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
                     bio,
