@@ -79,14 +79,6 @@ sealed class Destination(
         constructor(item: BaseItem) : this(item.id, item.type, item.data.collectionType)
     }
 
-    /** Wholphin's original details page (Jellyeye shows its own info screen by default). */
-    @Serializable
-    data class OriginalDetails(
-        val itemId: UUID,
-        val type: BaseItemKind,
-        val seasonEpisode: SeasonEpisodeIds? = null,
-    ) : Destination()
-
     @Serializable
     data class Recordings(
         val itemId: UUID,

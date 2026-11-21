@@ -132,15 +132,22 @@ fun JellyeyeInfo(
             return@Box
         }
         val firstFocus = remember { FocusRequester() }
-        // a collection's Play button only appears once its films have loaded
-        val focusReady = item.type != BaseItemKind.BOX_SET || state.films.isNotEmpty()
-        LaunchedEffect(item.id, focusReady) {
-            if (focusReady) {
-                delay(150)
-                firstFocus.tryRequestFocus()
-            }
-        }
         val listState = rememberLazyListState()
+        // focus: the title you came back to (a poster, episode, cast member...), else the page's first button
+        // (see JellyeyeFocus.kt). A collection's Play button only appears once its films have loaded.
+        val memory = viewModel.focusMemory
+        val restoreTile = remember { FocusRequester() }
+        val focusMap = rememberReturnFocusMap(memory, restoreTile)
+        PageFocus(
+            memory,
+            listState,
+            ready = item.type != BaseItemKind.BOX_SET || state.films.isNotEmpty(),
+            restore = restoreTile,
+            main = firstFocus,
+        )
+        val open = { target: BaseItem -> memory.leaving(target.id, listState); viewModel.open(target) }
+        val openPerson = { id: UUID -> memory.leaving(id, listState); viewModel.openPerson(id) }
+        val playEpisode = { ep: BaseItem -> memory.leaving(ep.id, listState); viewModel.play(ep) }
         val scope = rememberCoroutineScope()
         // anything focused in the header brings the whole header (the top of the page) back into view
         val showTop =
@@ -166,13 +173,13 @@ fun JellyeyeInfo(
                     item.data.overview?.takeIf { it.isNotBlank() }?.let { bio ->
                         gapItem("bio") { Biography(bio) }
                     }
-                    posterSection("films", "Films in your library · ${state.films.size}", state.films, viewModel::open)
-                    posterSection("shows", "TV in your library · ${state.shows.size}", state.shows, viewModel::open)
+                    posterSection("films", "Films in your library · ${state.films.size}", state.films, open, focusRequesters = focusMap)
+                    posterSection("shows", "TV in your library · ${state.shows.size}", state.shows, open, focusRequesters = focusMap)
                 } else {
                     gapItem("hero") {
                         Box(showTop) {
                             if (item.type == BaseItemKind.BOX_SET) {
-                                CollectionSpotlight(item, state, now, firstFocus, viewModel)
+                                CollectionSpotlight(item, state, now, firstFocus, viewModel, onOpen = open)
                             } else {
                                 InfoHeader(item, state, now, firstFocus, viewModel, onMore = { showMenu = true })
                             }
@@ -180,10 +187,10 @@ fun JellyeyeInfo(
                     }
                     if (hasAbout(item)) gapItem("about") { AboutRow(item) }
                     if (item.type == BaseItemKind.BOX_SET) {
-                        posterSection("collection", "In this collection · ${state.films.size}", state.films, viewModel::open)
+                        posterSection("collection", "In this collection · ${state.films.size}", state.films, open, focusRequesters = focusMap)
                     }
                     if (item.type == BaseItemKind.SERIES && state.seasons.isNotEmpty()) {
-                        episodeSection(state, now, viewModel)
+                        episodeSection(state, viewModel, playEpisode, focusMap)
                     }
                     val cast =
                         item.data.people.orEmpty().filter {
@@ -191,13 +198,13 @@ fun JellyeyeInfo(
                         }
                     if (cast.isNotEmpty()) {
                         gapItem("cast") {
-                            SectionTile("Cast") { CastGrid(cast.take(32), onClick = { viewModel.openPerson(it.id) }) }
+                            SectionTile("Cast") { CastGrid(cast.take(32), onClick = { openPerson(it.id) }, focusRequesters = focusMap) }
                         }
                     }
                     if (state.similar.isNotEmpty()) {
                         gapItem("similar") {
                             SectionTile("More like this") {
-                                PosterGrid(state.similar, rows = 3, onClick = viewModel::open, fullRowsOnly = false)
+                                PosterGrid(state.similar, rows = 3, onClick = open, fullRowsOnly = false, focusRequesters = focusMap)
                             }
                         }
                     }
@@ -499,8 +506,9 @@ private fun Label(text: String) {
 /** Season pills, then the episodes one per row (built as you scroll, not all at once). */
 private fun LazyListScope.episodeSection(
     state: JellyeyeInfoState,
-    now: LocalDateTime,
     viewModel: JellyeyeInfoViewModel,
+    onPlay: (BaseItem) -> Unit,
+    focusRequesters: Map<UUID, FocusRequester>,
 ) {
     item(key = "episodes-top") {
         PanelTop("Episodes") {
@@ -528,7 +536,7 @@ private fun LazyListScope.episodeSection(
         }
     }
     itemsIndexed(state.episodes, key = { _, ep -> "ep-${ep.id}" }) { _, ep ->
-        PanelRow { EpisodeRow(ep, state, viewModel) }
+        PanelRow { EpisodeRow(ep, state, onPlay, focusRequesters[ep.id]) }
     }
     item(key = "episodes-end") { PanelBottom() }
 }
@@ -537,13 +545,14 @@ private fun LazyListScope.episodeSection(
 private fun EpisodeRow(
     ep: BaseItem,
     state: JellyeyeInfoState,
-    viewModel: JellyeyeInfoViewModel,
+    onPlay: (BaseItem) -> Unit,
+    focusRequester: FocusRequester?,
 ) {
     val imageUrls = LocalImageUrlService.current
     val isChosen = ep.id == state.chosenEpisodeId
     val isNext = isChosen || (state.chosenEpisodeId == null && ep.id == state.nextEpisode?.id)
     val eud = ep.data.userData
-    JeTile(onClick = { viewModel.play(ep) }, modifier = Modifier.fillMaxWidth(), leftEdge = true) { focused ->
+    JeTile(onClick = { onPlay(ep) }, modifier = Modifier.fillMaxWidth(), focusRequester = focusRequester, leftEdge = true) { focused ->
         Row(
             modifier =
                 Modifier
@@ -604,6 +613,7 @@ private fun EpisodeRow(
 private fun CastGrid(
     cast: List<BaseItemPerson>,
     onClick: (BaseItemPerson) -> Unit,
+    focusRequesters: Map<UUID, FocusRequester> = emptyMap(),
 ) {
     val imageUrls = LocalImageUrlService.current
     val columns = 8
@@ -611,7 +621,12 @@ private fun CastGrid(
         cast.chunked(columns).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 row.forEach { person ->
-                    JeTile(onClick = { onClick(person) }, modifier = Modifier.weight(1f), leftEdge = person === row.first()) { focused ->
+                    JeTile(
+                        onClick = { onClick(person) },
+                        modifier = Modifier.weight(1f),
+                        focusRequester = focusRequesters[person.id],
+                        leftEdge = person === row.first(),
+                    ) { focused ->
                         Column(
                             Modifier.fillMaxWidth().padding(vertical = 4.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -760,6 +775,7 @@ private fun CollectionSpotlight(
     now: LocalDateTime,
     firstFocus: FocusRequester,
     viewModel: JellyeyeInfoViewModel,
+    onOpen: (BaseItem) -> Unit,
 ) {
     val all = state.films
     if (all.isEmpty()) {
@@ -800,7 +816,7 @@ private fun CollectionSpotlight(
         now = now,
         playFocus = firstFocus,
         onPlay = { viewModel.play(it) },
-        onInfo = viewModel::open,
+        onInfo = onOpen,
         badge = { _, _ -> "Collection · ${collection.name ?: ""} · ${all.size} ${if (all.size == 1) "title" else "titles"}" },
         onWornOut = if (state.collectionInOrder || all.size <= 6) null else ({ round++ }),
         extraButtons = {

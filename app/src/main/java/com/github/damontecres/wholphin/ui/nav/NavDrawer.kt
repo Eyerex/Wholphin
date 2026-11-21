@@ -1,5 +1,10 @@
 package com.github.damontecres.wholphin.ui.nav
 
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.Key
 import androidx.compose.runtime.CompositionLocalProvider
 import com.github.damontecres.wholphin.ui.jellyeye.JE
 import android.content.Context
@@ -333,7 +338,15 @@ fun NavDrawer(
     )
 
     ModalNavigationDrawer(
-        modifier = modifier,
+        // Jellyeye: note every Left press, so the menu can tell being opened on purpose from stray focus
+        modifier =
+            modifier.onPreviewKeyEvent { e ->
+                if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionLeft) {
+                    com.github.damontecres.wholphin.ui.jellyeye.JeMenuIntent
+                        .pressed()
+                }
+                false
+            },
         drawerState = drawerState,
         drawerContent = { drawerValue ->
             val isOpen = drawerValue.isOpen

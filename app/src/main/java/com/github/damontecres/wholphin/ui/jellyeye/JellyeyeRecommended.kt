@@ -1,5 +1,7 @@
 package com.github.damontecres.wholphin.ui.jellyeye
 
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
@@ -41,6 +43,7 @@ fun JellyeyeRecommended(
     onPlay: (BaseItem) -> Unit,
     onViewAll: (rowIndex: Int, row: HomeRowLoadingState.Success) -> Unit,
     modifier: Modifier = Modifier,
+    memoryKey: String = "jellyeye-rec",
 ) {
     var now by remember { mutableStateOf(LocalDateTime.now()) }
     LaunchedEffect(Unit) {
@@ -49,8 +52,23 @@ fun JellyeyeRecommended(
             now = LocalDateTime.now()
         }
     }
+    // focus: the title you came back to, else the first title (see JellyeyeFocus.kt)
+    val memory = rememberJeReturn(memoryKey)
+    val listState = rememberLazyListState()
+    val firstTile = remember { FocusRequester() }
+    val restoreTile = remember { FocusRequester() }
+    val firstId =
+        rows
+            .firstNotNullOfOrNull { (it as? HomeRowLoadingState.Success)?.items?.firstOrNull { item -> item != null } }
+            ?.id
+    val restore = if (memory.id != null && memory.id == firstId) firstTile else restoreTile
+    val focusMap = rememberReturnFocusMap(memory, restore, extra = firstId?.let { mapOf(it to firstTile) } ?: emptyMap())
+    PageFocus(memory, listState, ready = firstId != null, restore = restore, main = firstTile)
+    val open = { item: BaseItem -> memory.leaving(item.id, listState); onOpen(item) }
+    val play = { item: BaseItem -> memory.leaving(item.id, listState); onPlay(item) }
     CompositionLocalProvider(LocalBringIntoViewSpec provides JellyeyeScrollSpec) {
         LazyColumn(
+            state = listState,
             // the library page already has the side margins; just a little room under the tabs
             contentPadding = PaddingValues(top = 4.dp, bottom = JeLayout.pageBottom),
             verticalArrangement = Arrangement.spacedBy(JeLayout.panelGap),
@@ -60,7 +78,7 @@ fun JellyeyeRecommended(
                 when (row) {
                     is HomeRowLoadingState.Success -> {
                         val items = remember(row.items) { row.items.filterNotNull() }
-                        if (items.isNotEmpty()) RecommendedPanel(index, row, items, now, onOpen, onPlay, onViewAll)
+                        if (items.isNotEmpty()) RecommendedPanel(index, row, items, now, open, play, onViewAll, focusMap)
                     }
 
                     is HomeRowLoadingState.Loading,
@@ -88,6 +106,7 @@ private fun RecommendedPanel(
     onOpen: (BaseItem) -> Unit,
     onPlay: (BaseItem) -> Unit,
     onViewAll: (Int, HomeRowLoadingState.Success) -> Unit,
+    focusMap: Map<java.util.UUID, FocusRequester>,
 ) {
     // things you're part way through (and next episodes) get the wide pictures with "finishes at", like the home page
     val inProgress =
@@ -95,9 +114,9 @@ private fun RecommendedPanel(
     val shown = if (inProgress) 10 else 16
     SectionTile(row.title.getString()) {
         if (inProgress) {
-            WideGrid(items, now, onClick = onPlay)
+            WideGrid(items, now, onClick = onPlay, focusRequesters = focusMap)
         } else {
-            PosterGrid(items, rows = 2, onClick = onOpen, fullRowsOnly = false)
+            PosterGrid(items, rows = 2, onClick = onOpen, fullRowsOnly = false, focusRequesters = focusMap)
         }
         if (row.showViewMore || items.size > shown) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {

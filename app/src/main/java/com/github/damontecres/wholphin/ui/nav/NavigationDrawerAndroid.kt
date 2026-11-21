@@ -21,6 +21,8 @@
 
 package com.github.damontecres.wholphin.ui.nav
 
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VisibilityThreshold
@@ -101,6 +103,7 @@ private fun DrawerSheet(
     var initializationComplete: Boolean by remember { mutableStateOf(false) }
     var focusState by remember { mutableStateOf<FocusState?>(null) }
     val focusRequester = remember { FocusRequester() }
+    val scope = rememberCoroutineScope()
     LaunchedEffect(key1 = drawerState.currentValue) {
         if (drawerState.currentValue == DrawerValue.Open && focusState?.hasFocus == false) {
             // used to grab focus if the drawer state is set to Open on start.
@@ -126,7 +129,25 @@ private fun DrawerSheet(
                 focusState = it
 
                 if (initializationComplete) {
-                    drawerState.setValue(if (it.hasFocus) DrawerValue.Open else DrawerValue.Closed)
+                    val stray =
+                        it.hasFocus &&
+                            drawerState.currentValue == DrawerValue.Closed &&
+                            !com.github.damontecres.wholphin.ui.jellyeye.JeMenuIntent
+                                .recent()
+                    if (stray) {
+                        // Jellyeye safety net: focus landed on the closed menu without Left being pressed (a page
+                        // appearing with nothing selected). Hand it back to the page instead of opening the menu;
+                        // only if there's no Jellyeye page to hand it to does the menu open as before.
+                        scope.launch {
+                            if (!com.github.damontecres.wholphin.ui.jellyeye.JePageFocus
+                                    .takeBack()
+                            ) {
+                                drawerState.setValue(DrawerValue.Open)
+                            }
+                        }
+                    } else {
+                        drawerState.setValue(if (it.hasFocus) DrawerValue.Open else DrawerValue.Closed)
+                    }
                 }
             }.focusGroup()
 

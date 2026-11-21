@@ -86,6 +86,9 @@ class JellyeyeInfoViewModel
         val state: StateFlow<JellyeyeInfoState> = _state
 
         private var loadedId: UUID? = null
+
+        /** Where you were when you opened a title, so coming back selects it again (see JellyeyeFocus.kt). */
+        val focusMemory = JeReturn()
         private var seasonEpisode: SeasonEpisodeIds? = null
 
         private val rowFields =
@@ -408,12 +411,6 @@ class JellyeyeInfoViewModel
                     sortAndDirection = SortAndDirection(ItemSortBy.PREMIERE_DATE, SortOrder.ASCENDING),
                 ),
             )
-        }
-
-        /** Wholphin's original details page, for its extra options. */
-        fun openOriginal() {
-            val item = _state.value.item ?: return
-            navigationManager.navigateTo(Destination.OriginalDetails(item.id, item.type, seasonEpisode))
         }
 
         fun toggleFavorite() {

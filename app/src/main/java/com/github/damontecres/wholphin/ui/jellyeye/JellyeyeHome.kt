@@ -459,12 +459,13 @@ internal fun LazyListScope.posterSection(
     items: List<BaseItem>,
     onClick: (BaseItem) -> Unit,
     columns: Int = 8,
+    focusRequesters: Map<UUID, FocusRequester> = emptyMap(),
 ) {
     if (items.isEmpty()) return
     val rows = items.chunked(columns)
     item(key = "$key-top") { PanelTop(title) }
     itemsIndexed(rows, key = { i, _ -> "$key-row-$i" }) { _, row ->
-        PanelRow { PosterRow(row, columns, onClick) }
+        PanelRow { PosterRow(row, columns, onClick, focusRequesters) }
     }
     item(key = "$key-end") { PanelBottom() }
 }
@@ -522,44 +523,14 @@ fun JellyeyeHome(
         }
         val playFocus = remember { FocusRequester() }
         val listState = rememberLazyListState()
-        // coming back from a title you opened here: select that title again (scrolling to its panel);
-        // otherwise the banner's Play. Retried for a moment while the page appears, so focus is never left
-        // with nothing (which let the side menu catch it and open)
+        // focus: the title you came back to, else the banner's Play (see JellyeyeFocus.kt)
+        val memory = viewModel.focusMemory
         val restoreTile = remember { FocusRequester() }
-        val backTo = viewModel.lastOpened?.takeIf { id -> state.spotlight.none { it.item.id == id } }
-        val focusMap = remember(backTo) { if (backTo != null) mapOf(backTo to restoreTile) else emptyMap() }
-        val showPanel = JeSettings.showSeasonalPanel
-        LaunchedEffect(state.spotlight.isNotEmpty()) {
-            if (state.spotlight.isNotEmpty()) {
-                delay(150)
-                if (backTo != null) {
-                    val panels =
-                        listOfNotNull(
-                            state.spotlight.map { it.item },
-                            state.pickUp.takeIf { it.isNotEmpty() },
-                            state.recommendedShows.takeIf { it.isNotEmpty() },
-                            state.recommendedFilms.takeIf { it.isNotEmpty() },
-                            if (!showPanel) {
-                                null
-                            } else if (state.season != null && state.seasonal.isNotEmpty()) {
-                                state.seasonal
-                            } else {
-                                state.gems.takeIf { it.isNotEmpty() }
-                            },
-                        )
-                    val panel = panels.indexOfFirst { p -> p.any { it.id == backTo } }
-                    if (panel > 0 && panel !in listState.layoutInfo.visibleItemsInfo.map { it.index }) listState.scrollToItem(panel)
-                    repeat(20) {
-                        if (restoreTile.tryRequestFocus()) return@LaunchedEffect
-                        delay(50)
-                    }
-                }
-                repeat(20) {
-                    if (playFocus.tryRequestFocus()) return@LaunchedEffect
-                    delay(50)
-                }
-            }
-        }
+        val focusMap = rememberReturnFocusMap(memory, restoreTile)
+        PageFocus(memory, listState, ready = state.spotlight.isNotEmpty(), restore = restoreTile, main = playFocus)
+        // opening or playing a title notes where you were, for coming back
+        val open = { item: BaseItem -> memory.leaving(item.id, listState); viewModel.open(item) }
+        val play = { item: BaseItem -> memory.leaving(item.id, listState); viewModel.play(item) }
         val scope = rememberCoroutineScope()
         CompositionLocalProvider(LocalBringIntoViewSpec provides JellyeyeScrollSpec) {
         LazyColumn(
@@ -586,8 +557,8 @@ fun JellyeyeHome(
                         items = state.spotlight,
                         now = now,
                         playFocus = playFocus,
-                        onPlay = viewModel::play,
-                        onInfo = viewModel::open,
+                        onPlay = play,
+                        onInfo = open,
                         onWornOut = viewModel::refreshSpotlight,
                     )
                 }
@@ -595,21 +566,21 @@ fun JellyeyeHome(
             if (state.pickUp.isNotEmpty()) {
                 item(key = "pickup") {
                     SectionTile("Pick up where you left off") {
-                        WideGrid(state.pickUp, now, onClick = viewModel::play, focusRequesters = focusMap)
+                        WideGrid(state.pickUp, now, onClick = play, focusRequesters = focusMap)
                     }
                 }
             }
             if (state.recommendedShows.isNotEmpty()) {
                 item(key = "shows") {
                     SectionTile("Recommended TV shows") {
-                        PosterGrid(state.recommendedShows, rows = 2, onClick = viewModel::open, focusRequesters = focusMap)
+                        PosterGrid(state.recommendedShows, rows = 2, onClick = open, focusRequesters = focusMap)
                     }
                 }
             }
             if (state.recommendedFilms.isNotEmpty()) {
                 item(key = "films") {
                     SectionTile("Recommended films") {
-                        PosterGrid(state.recommendedFilms, rows = 2, onClick = viewModel::open, focusRequesters = focusMap)
+                        PosterGrid(state.recommendedFilms, rows = 2, onClick = open, focusRequesters = focusMap)
                     }
                 }
             }
@@ -618,14 +589,14 @@ fun JellyeyeHome(
                 // switched off in Settings → Jellyeye
             } else if (season != null && state.seasonal.isNotEmpty()) {
                 item(key = "season") {
-                    SeasonPanel(season, state.seasonal, onClick = viewModel::open, focusRequesters = focusMap)
+                    SeasonPanel(season, state.seasonal, onClick = open, focusRequesters = focusMap)
                 }
             } else if (state.gems.isNotEmpty()) {
                 // no holiday right now: the same spot shows highly rated titles you haven't seen
                 item(key = "gems") {
                     SectionTile("Hidden gems") {
                         Text("Highly rated in your library, and you haven't watched them yet", color = JE.dim, fontSize = 12.sp)
-                        PosterGrid(state.gems, rows = 2, onClick = viewModel::open, focusRequesters = focusMap)
+                        PosterGrid(state.gems, rows = 2, onClick = open, focusRequesters = focusMap)
                     }
                 }
             }
@@ -637,7 +608,6 @@ fun JellyeyeHome(
 /* ------------------------------------------------------------------
    Spotlight: the big rotating card at the top
    ------------------------------------------------------------------ */
-private const val SLIDE_MS = 8_000
 
 // how many times the home banner goes round before it fetches a new set (5 slides x 8s x 3 = about 2 minutes)
 private const val SPOTLIGHT_ROUNDS = 3

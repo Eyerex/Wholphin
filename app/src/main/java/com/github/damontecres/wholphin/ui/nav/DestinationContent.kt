@@ -146,34 +146,6 @@ fun DestinationContent(
             )
         }
 
-        is Destination.OriginalDetails -> {
-            val original = Destination.MediaItem(destination.itemId, destination.type)
-            when (destination.type) {
-                BaseItemKind.SERIES -> {
-                    val se = destination.seasonEpisode
-                    if (se != null) {
-                        SeriesOverview(
-                            preferences = preferences,
-                            destination = Destination.SeriesOverview(destination.itemId, destination.type, se),
-                            initialSeasonEpisode = se,
-                            modifier = modifier,
-                        )
-                    } else {
-                        SeriesDetails(preferences, original, modifier)
-                    }
-                }
-                BaseItemKind.PERSON -> {
-                    LaunchedEffect(Unit) { onClearBackdrop.invoke() }
-                    PersonPage(preferences, original, modifier)
-                }
-                BaseItemKind.BOX_SET -> {
-                    LaunchedEffect(Unit) { onClearBackdrop.invoke() }
-                    CollectionDetails(preferences = preferences, itemId = destination.itemId, modifier = modifier)
-                }
-                else -> MovieDetails(preferences, original, modifier)
-            }
-        }
-
         is Destination.MediaItem -> {
             when (destination.type) {
                 BaseItemKind.SERIES,
