@@ -243,12 +243,16 @@ fun JeFocusable(
 internal fun JeTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    focusRequester: FocusRequester? = null,
     content: @Composable (focused: Boolean) -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     Column(
-        modifier = modifier.clickable(interactionSource = interaction, indication = null, onClick = onClick),
+        modifier =
+            modifier
+                .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+                .clickable(interactionSource = interaction, indication = null, onClick = onClick),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         content(focused)
@@ -786,6 +790,7 @@ internal fun WideGrid(
     items: List<BaseItem>,
     now: LocalDateTime,
     onClick: (BaseItem) -> Unit,
+    firstFocus: FocusRequester? = null,
 ) {
     val imageUrls = LocalImageUrlService.current
     val columns = 5
@@ -793,7 +798,7 @@ internal fun WideGrid(
         items.take(columns * 2).chunked(columns).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 row.forEach { item ->
-                    JeTile(onClick = { onClick(item) }, modifier = Modifier.weight(1f)) { focused ->
+                    JeTile(onClick = { onClick(item) }, modifier = Modifier.weight(1f), focusRequester = if (item === items.first()) firstFocus else null) { focused ->
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Box(
                                 Modifier
@@ -878,6 +883,7 @@ internal fun PosterGrid(
     onClick: (BaseItem) -> Unit,
     columns: Int = 8,
     fullRowsOnly: Boolean = true,
+    firstFocus: FocusRequester? = null,
 ) {
     val imageUrls = LocalImageUrlService.current
     // only complete rows, like the web version (unless every title should be shown, e.g. an actor's films)
@@ -888,7 +894,7 @@ internal fun PosterGrid(
             (items.size.coerceAtMost(columns * rows) / columns * columns).takeIf { it > 0 } ?: items.size.coerceAtMost(columns)
         }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        items.take(count).chunked(columns).forEach { row -> PosterRow(row, columns, onClick) }
+        items.take(count).chunked(columns).forEachIndexed { i, row -> PosterRow(row, columns, onClick, if (i == 0) firstFocus else null) }
     }
 }
 
@@ -898,11 +904,12 @@ internal fun PosterRow(
     row: List<BaseItem>,
     columns: Int,
     onClick: (BaseItem) -> Unit,
+    firstFocus: FocusRequester? = null,
 ) {
     val imageUrls = LocalImageUrlService.current
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         row.forEach { item ->
-            JeTile(onClick = { onClick(item) }, modifier = Modifier.weight(1f)) { focused ->
+            JeTile(onClick = { onClick(item) }, modifier = Modifier.weight(1f), focusRequester = if (item === row.first()) firstFocus else null) { focused ->
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Box(
                         Modifier

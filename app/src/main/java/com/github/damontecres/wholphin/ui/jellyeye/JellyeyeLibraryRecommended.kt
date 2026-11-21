@@ -1,5 +1,12 @@
 package com.github.damontecres.wholphin.ui.jellyeye
 
+import com.github.damontecres.wholphin.ui.tryRequestFocus
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
@@ -458,12 +465,25 @@ fun JellyeyeLibraryRecommended(
             now = LocalDateTime.now()
         }
     }
+    // pressing Down from the tabs always lands on the first title of the first panel
+    val firstTile = remember { FocusRequester() }
+    val listState = rememberLazyListState()
     CompositionLocalProvider(LocalBringIntoViewSpec provides JellyeyeScrollSpec) {
         LazyColumn(
+            state = listState,
             // the library page already has the side margins; just a little room under the tabs
             contentPadding = PaddingValues(top = 4.dp, bottom = JeLayout.pageBottom),
             verticalArrangement = Arrangement.spacedBy(JeLayout.panelGap),
-            modifier = modifier.fillMaxSize(),
+            modifier =
+                modifier
+                    .fillMaxSize()
+                    .focusProperties {
+                        onEnter = {
+                            if (requestedFocusDirection == FocusDirection.Down || requestedFocusDirection == FocusDirection.Enter) {
+                                if (listState.firstVisibleItemIndex == 0) firstTile.tryRequestFocus()
+                            }
+                        }
+                    }.focusGroup(),
         ) {
             if (!state.loaded) {
                 item(key = "loading") {
@@ -480,12 +500,13 @@ fun JellyeyeLibraryRecommended(
             }
             val sections =
                 if (JeSettings.showBecauseYouWatched) state.sections else state.sections.filterNot { it.key.startsWith("because-") }
-            items(sections, key = { it.key }) { s ->
+            itemsIndexed(sections, key = { _, s -> s.key }) { index, s ->
+                val focus = if (index == 0) firstTile else null
                 SectionTile(s.title) {
                     if (s.wide) {
-                        WideGrid(s.items, now, onClick = viewModel::play)
+                        WideGrid(s.items, now, onClick = viewModel::play, firstFocus = focus)
                     } else {
-                        PosterGrid(s.items, rows = 2, onClick = viewModel::open, fullRowsOnly = false)
+                        PosterGrid(s.items, rows = 2, onClick = viewModel::open, fullRowsOnly = false, firstFocus = focus)
                     }
                 }
             }
