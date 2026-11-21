@@ -368,7 +368,11 @@ class JellyeyeHomeViewModel
             ).filter { it.id !in exclude }
 
         /** Open the normal details page for a title. */
+        /** The title you last opened or played from the home page, so coming back selects it again. */
+        var lastOpened: UUID? = null
+
         fun open(item: BaseItem) {
+            lastOpened = item.id
             navigationManager.navigateTo(item.destination())
         }
 
@@ -377,6 +381,7 @@ class JellyeyeHomeViewModel
          * a TV show plays its next episode, or the first one if you haven't started it.
          */
         fun play(item: BaseItem) {
+            lastOpened = item.id
             if (item.type.playable) {
                 navigationManager.navigateTo(Destination.Playback(item))
                 return
