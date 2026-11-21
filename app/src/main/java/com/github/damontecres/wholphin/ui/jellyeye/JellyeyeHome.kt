@@ -750,7 +750,7 @@ internal fun Spotlight(
    Pick up where you left off: wide pictures with progress and finish time
    ------------------------------------------------------------------ */
 @Composable
-private fun WideGrid(
+internal fun WideGrid(
     items: List<BaseItem>,
     now: LocalDateTime,
     onClick: (BaseItem) -> Unit,

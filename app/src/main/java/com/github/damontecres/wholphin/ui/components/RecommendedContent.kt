@@ -406,49 +406,12 @@ fun RecommendedContent(
                     )
                 }
 
-            HomePageContent(
-                homeRows = state.rows,
-                position = position,
-                onClickItem = { _, item ->
-                    viewModel.navigationManager.navigateTo(item.destination())
-                },
-                onLongClickItem = { position, item ->
-                    showContextMenu =
-                        ContextMenu.ForBaseItem(
-                            fromLongClick = true,
-                            item = item,
-                            chosenStreams = null,
-                            showGoTo = true,
-                            showStreamChoices = false,
-                            canDelete = viewModel.canDelete(item, preferences.appPreferences),
-                            canRemoveContinueWatching = false,
-                            canRemoveNextUp = false,
-                            actions = contextActions,
-                        )
-                },
-                onClickPlay = { _, item ->
-                    viewModel.navigationManager.navigateTo(Destination.Playback(item))
-                },
-                onFocusPosition = {
-                    position = it
-                    val nonEmptyRowBefore =
-                        state.rows
-                            .subList(0, it.row)
-                            .count {
-                                it is HomeRowLoadingState.Success && it.items.isEmpty()
-                            }
-                    onFocusPosition?.invoke(
-                        RowColumn(
-                            it.row - nonEmptyRowBefore,
-                            it.column,
-                        ),
-                    )
-                },
-                showClock = preferences.appPreferences.interfacePreferences.showClock,
-                onUpdateBackdrop = viewModel::updateBackdrop,
-                showLogo = preferences.appPreferences.interfacePreferences.showLogos,
-                showViewMore = true,
-                onClickViewMore = viewModel::onClickViewMore,
+            // Jellyeye: the same look as the home page, scrolling downwards only
+            com.github.damontecres.wholphin.ui.jellyeye.JellyeyeRecommended(
+                rows = state.rows,
+                onOpen = { item -> viewModel.navigationManager.navigateTo(item.destination()) },
+                onPlay = { item -> viewModel.navigationManager.navigateTo(Destination.Playback(item)) },
+                onViewAll = { index, row -> viewModel.onClickViewMore(RowColumn(index, row.items.size), row) },
                 modifier = modifier,
             )
         }
