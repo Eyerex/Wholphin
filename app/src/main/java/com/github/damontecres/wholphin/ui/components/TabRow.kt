@@ -232,7 +232,7 @@ fun Tab(
                 },
             modifier =
                 Modifier
-                    .background(if (selected) Color(0x33E5A00D) else Color(0x12FFFFFF), pill)
+                    .background(if (selected) JE.accent.copy(alpha = 0.20f) else Color(0x12FFFFFF), pill)
                     .padding(horizontal = 16.dp, vertical = 7.dp),
         )
     }

@@ -287,3 +287,8 @@ fun SubtitlePreferences.Builder.resetSubtitles() {
     edgeThickness = SubtitleSettings.EdgeThickness.defaultValue.toInt()
     imageSubtitleOpacity = SubtitleSettings.ImageOpacity.defaultValue.toInt()
 }
+
+inline fun AppPreferences.updateJellyeyePreferences(block: JellyeyePreferences.Builder.() -> Unit): AppPreferences =
+    update {
+        jellyeyePreferences = jellyeyePreferences.toBuilder().apply(block).build()
+    }

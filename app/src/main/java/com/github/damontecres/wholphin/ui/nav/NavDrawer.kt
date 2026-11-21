@@ -1,5 +1,6 @@
 package com.github.damontecres.wholphin.ui.nav
 
+import com.github.damontecres.wholphin.ui.jellyeye.JE
 import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -600,7 +601,7 @@ fun NavigationDrawerScope.ProfileIcon(
         onClick = onClick,
         colors =
             NavigationDrawerItemDefaults.colors(
-                focusedContainerColor = Color(0x33E5A00D),
+                focusedContainerColor = JE.accent.copy(alpha = 0.20f),
                 focusedContentColor = Color.White,
             ),
         leadingContent = {
@@ -646,7 +647,7 @@ fun NavigationDrawerScope.IconNavItem(
         onClick = onClick,
         colors =
             NavigationDrawerItemDefaults.colors(
-                focusedContainerColor = Color(0x33E5A00D),
+                focusedContainerColor = JE.accent.copy(alpha = 0.20f),
                 focusedContentColor = Color.White,
             ),
         leadingContent = {
@@ -727,7 +728,7 @@ fun NavigationDrawerScope.NavItem(
         colors =
             NavigationDrawerItemDefaults.colors(
                 containerColor = containerColor,
-                focusedContainerColor = Color(0x33E5A00D),
+                focusedContainerColor = JE.accent.copy(alpha = 0.20f),
                 focusedContentColor = Color.White,
             ),
         leadingContent = {
@@ -793,16 +794,17 @@ fun navItemColor(
     } else {
         val alpha =
             when {
-                theme == AppThemeColors.ORANGE -> 1f
+                // Jellyeye: the menu uses Jellyeye's colours with every theme
+                true -> 1f
                 drawerOpen -> .85f
                 selected && !drawerOpen -> .5f
                 else -> .2f
             }
         return when {
             // Jellyeye palette
-            theme == AppThemeColors.ORANGE && selected -> Color(0xFFE5A00D)
-            theme == AppThemeColors.ORANGE && focused -> Color.White
-            theme == AppThemeColors.ORANGE -> Color(0xFF9A9FA5)
+            selected -> JE.accent
+            focused -> Color.White
+            true -> Color(0xFF9A9FA5)
 
             selected && focused -> {
                 when (theme) {

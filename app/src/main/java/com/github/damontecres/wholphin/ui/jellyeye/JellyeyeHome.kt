@@ -1,5 +1,7 @@
 package com.github.damontecres.wholphin.ui.jellyeye
 
+import com.github.damontecres.wholphin.preferences.JellyeyePreferences
+import com.github.damontecres.wholphin.preferences.AppThemeColors
 import coil3.request.ImageRequest
 import coil3.SingletonImageLoader
 import androidx.compose.ui.platform.LocalContext
@@ -117,18 +119,64 @@ internal object JellyeyeScrollSpec : BringIntoViewSpec {
 }
 
 /** Jellyeye colours: the same palette as the web design. */
+/** One Jellyeye colour set per Wholphin colour theme (vivid versions, so rings and buttons stay punchy). */
+data class JePalette(
+    val accent: Color,
+    val accent2: Color,
+    val onAccent: Color,
+    val bg: Color,
+    val tile: Color,
+)
+
+private val darkText = Color(0xFF1A1A1A)
+private val JE_PALETTES =
+    mapOf(
+        AppThemeColors.ORANGE to JePalette(JE.accent, JE.accent2, darkText, Color(0xFF16171A), Color(0xB81E2023)),
+        AppThemeColors.BLUE to JePalette(Color(0xFF3B82F6), Color(0xFF7CB0FF), Color.White, Color(0xFF111318), Color(0xB81A1E26)),
+        AppThemeColors.BOLD_BLUE to JePalette(Color(0xFF2563EB), Color(0xFF5B8DF5), Color.White, Color(0xFF0D1220), Color(0xB8141B2C)),
+        AppThemeColors.GREEN to JePalette(Color(0xFF22C55E), Color(0xFF5EE08C), darkText, Color(0xFF101510), Color(0xB8182019)),
+        AppThemeColors.PURPLE to JePalette(Color(0xFFA855F7), Color(0xFFC79BFF), Color.White, Color(0xFF15121C), Color(0xB81F1A28)),
+        AppThemeColors.RED to JePalette(Color(0xFFEF4444), Color(0xFFFF8A80), Color.White, Color(0xFF1A1110), Color(0xB8261A19)),
+        AppThemeColors.BROWN to JePalette(Color(0xFFC9803E), Color(0xFFE6A267), darkText, Color(0xFF19120D), Color(0xB8261C15)),
+        // OLED: pure black backgrounds, keeping Jellyeye's orange
+        AppThemeColors.OLED_BLACK to JePalette(JE.accent, JE.accent2, darkText, Color(0xFF000000), Color(0xB80E0E0E)),
+    )
+
+/** Jellyeye's colours. They follow the colour theme chosen in Settings (orange unless you pick another). */
 object JE {
-    val bg = Color(0xFF16171A)
-    val tile = Color(0xB81E2023)
+    private val palette = mutableStateOf(JE_PALETTES.getValue(AppThemeColors.ORANGE))
+
+    fun apply(theme: AppThemeColors) {
+        val next = JE_PALETTES[theme] ?: JE_PALETTES.getValue(AppThemeColors.ORANGE)
+        if (palette.value != next) palette.value = next
+    }
+
+    val bg get() = palette.value.bg
+    val tile get() = palette.value.tile
+    val accent get() = palette.value.accent
+    val accent2 get() = palette.value.accent2
+    val onAccent get() = palette.value.onAccent
     val line = Color(0x14FFFFFF)
-    val accent = Color(0xFFE5A00D)
-    val accent2 = Color(0xFFF0B429)
-    val onAccent = Color(0xFF1A1A1A)
     val text = Color(0xFFECEFF1)
     val soft = Color(0xFFC9CDD2)
     val dim = Color(0xFF9A9FA5)
     val critic = Color(0xFF7AA2F7)
     val ghost = Color(0x21FFFFFF)
+}
+
+/** Jellyeye's own settings (Settings → Jellyeye). */
+object JeSettings {
+    var bannerZoom by mutableStateOf(true)
+    var slideMs by mutableIntStateOf(8_000)
+    var showSeasonalPanel by mutableStateOf(true)
+    var showBecauseYouWatched by mutableStateOf(true)
+
+    fun apply(prefs: JellyeyePreferences) {
+        bannerZoom = !prefs.noBannerZoom
+        slideMs = (prefs.slideSeconds.takeIf { it > 0 } ?: 8) * 1_000
+        showSeasonalPanel = !prefs.hideSeasonalPanel
+        showBecauseYouWatched = !prefs.hideBecauseYouWatched
+    }
 }
 
 /** The same space everywhere: banner height, page margins and the gap between panels. */
@@ -253,7 +301,7 @@ internal fun Chip(
         modifier =
             Modifier
                 .clip(RoundedCornerShape(20.dp))
-                .background(if (gold) Color(0x2EE5A00D) else Color(0x1AFFFFFF))
+                .background(if (gold) JE.accent.copy(alpha = 0.18f) else Color(0x1AFFFFFF))
                 .padding(horizontal = 11.dp, vertical = 5.dp),
     )
 }
@@ -428,7 +476,7 @@ fun JellyeyeHome(
                 .fillMaxSize()
                 .background(
                     Brush.radialGradient(
-                        colors = listOf(Color(0x21E5A00D), JE.bg),
+                        colors = listOf(JE.accent.copy(alpha = 0.13f), JE.bg),
                         center = androidx.compose.ui.geometry.Offset(0f, 0f),
                         radius = 1400f,
                     ),
@@ -505,7 +553,9 @@ fun JellyeyeHome(
                 }
             }
             val season = state.season
-            if (season != null && state.seasonal.isNotEmpty()) {
+            if (!JeSettings.showSeasonalPanel) {
+                // switched off in Settings → Jellyeye
+            } else if (season != null && state.seasonal.isNotEmpty()) {
                 item(key = "season") {
                     SeasonPanel(season, state.seasonal, onClick = viewModel::open)
                 }
@@ -552,7 +602,7 @@ internal fun Spotlight(
     val progress = remember { Animatable(0f) }
     LaunchedEffect(index, items) {
         progress.snapTo(0f)
-        progress.animateTo(1f, tween(SLIDE_MS, easing = LinearEasing))
+        progress.animateTo(1f, tween(JeSettings.slideMs, easing = LinearEasing))
         if (items.size > 1) {
             val next = (index + 1) % items.size
             if (next == 0 && onWornOut != null && ++rounds >= SPOTLIGHT_ROUNDS) {
@@ -588,7 +638,9 @@ internal fun Spotlight(
         Crossfade(targetState = current.item, label = "spotlightBg") { item ->
             // slow push-in: every slide starts at normal size and zooms in gently while it's on screen
             val zoom = remember(item.id) { Animatable(1f) }
-            LaunchedEffect(item.id) { zoom.animateTo(1.06f, tween(SLIDE_MS + 1_000, easing = LinearEasing)) }
+            LaunchedEffect(item.id) {
+                if (JeSettings.bannerZoom) zoom.animateTo(1.06f, tween(JeSettings.slideMs + 1_000, easing = LinearEasing))
+            }
             val backdrop = remember(item.id) { imageUrls.getItemImageUrl(item, ImageType.BACKDROP, fillWidth = 1280) }
             AsyncImage(
                 model = backdrop,
@@ -712,8 +764,8 @@ internal fun Spotlight(
                                 Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(if (i == index) Color(0x24E5A00D) else Color(0x61000000))
-                                    .border(1.dp, if (i == index) Color(0x99E5A00D) else JE.line, RoundedCornerShape(12.dp))
+                                    .background(if (i == index) JE.accent.copy(alpha = 0.14f) else Color(0x61000000))
+                                    .border(1.dp, if (i == index) JE.accent.copy(alpha = 0.60f) else JE.line, RoundedCornerShape(12.dp))
                                     .padding(horizontal = 10.dp, vertical = 7.dp),
                             verticalArrangement = Arrangement.spacedBy(3.dp),
                         ) {

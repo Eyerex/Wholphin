@@ -554,6 +554,49 @@ sealed interface AppPreference<Pref, T> {
                 summaryOff = R.string.disabled,
             )
 
+        /* ---------------- Jellyeye ---------------- */
+
+        val JellyeyeBannerZoom =
+            AppSwitchPreference<AppPreferences>(
+                title = R.string.jellyeye_banner_zoom,
+                defaultValue = true,
+                getter = { !it.jellyeyePreferences.noBannerZoom },
+                setter = { prefs, value -> prefs.updateJellyeyePreferences { noBannerZoom = !value } },
+                summaryOn = R.string.enabled,
+                summaryOff = R.string.disabled,
+            )
+
+        val JellyeyeSlideTime =
+            AppChoicePreference<AppPreferences, Int>(
+                title = R.string.jellyeye_slide_time,
+                defaultValue = 8,
+                displayValues = R.array.jellyeye_slide_times,
+                indexToValue = { listOf(6, 8, 12).getOrElse(it) { 8 } },
+                valueToIndex = { listOf(6, 8, 12).indexOf(it).coerceAtLeast(0) },
+                getter = { it.jellyeyePreferences.slideSeconds.takeIf { s -> s > 0 } ?: 8 },
+                setter = { prefs, value -> prefs.updateJellyeyePreferences { slideSeconds = value } },
+            )
+
+        val JellyeyeSeasonalPanel =
+            AppSwitchPreference<AppPreferences>(
+                title = R.string.jellyeye_seasonal_panel,
+                defaultValue = true,
+                getter = { !it.jellyeyePreferences.hideSeasonalPanel },
+                setter = { prefs, value -> prefs.updateJellyeyePreferences { hideSeasonalPanel = !value } },
+                summaryOn = R.string.enabled,
+                summaryOff = R.string.disabled,
+            )
+
+        val JellyeyeBecauseYouWatched =
+            AppSwitchPreference<AppPreferences>(
+                title = R.string.jellyeye_because_you_watched,
+                defaultValue = true,
+                getter = { !it.jellyeyePreferences.hideBecauseYouWatched },
+                setter = { prefs, value -> prefs.updateJellyeyePreferences { hideBecauseYouWatched = !value } },
+                summaryOn = R.string.enabled,
+                summaryOff = R.string.disabled,
+            )
+
         val ThemeColors =
             AppChoicePreference<AppPreferences, AppThemeColors>(
                 title = R.string.app_theme,
@@ -1170,6 +1213,17 @@ sealed interface AppPreference<Pref, T> {
 val basicPreferences =
     listOf(
         PreferenceGroup(
+            title = R.string.jellyeye_settings,
+            preferences =
+                listOf(
+                    AppPreference.ThemeColors,
+                    AppPreference.JellyeyeBannerZoom,
+                    AppPreference.JellyeyeSlideTime,
+                    AppPreference.JellyeyeSeasonalPanel,
+                    AppPreference.JellyeyeBecauseYouWatched,
+                ),
+        ),
+        PreferenceGroup(
             title = R.string.ui_interface,
             preferences =
                 listOf(
@@ -1177,7 +1231,6 @@ val basicPreferences =
                     AppPreference.RememberSelectedTab,
                     AppPreference.PlayThemeMusic,
                     AppPreference.SubtitleStyle,
-                    AppPreference.ThemeColors,
                     AppPreference.ScreensaverSettings,
                 ),
         ),

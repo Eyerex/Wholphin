@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="jellyeye_settings" translatable="false">Jellyeye</string>
+    <string name="jellyeye_banner_zoom" translatable="false">Banner zoom</string>
+    <string name="jellyeye_slide_time" translatable="false">Time on each banner slide</string>
+    <string name="jellyeye_seasonal_panel" translatable="false">Holiday / Hidden gems panel on the home page</string>
+    <string name="jellyeye_because_you_watched" translatable="false">"Because you watched" on Recommended</string>
+    <string-array name="jellyeye_slide_times" translatable="false">
+        <item>6 seconds</item>
+        <item>8 seconds</item>
+        <item>12 seconds</item>
+    </string-array>
+</resources>

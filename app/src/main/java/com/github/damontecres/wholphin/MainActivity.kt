@@ -1,5 +1,6 @@
 package com.github.damontecres.wholphin
 
+import androidx.compose.runtime.SideEffect
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
@@ -261,6 +262,13 @@ class MainActivity : AppCompatActivity() {
                             )
                             LaunchedEffect(appPreferences.debugLogging) {
                                 DebugLogTree.INSTANCE.enabled = appPreferences.debugLogging
+                            }
+                            // Jellyeye's screens follow the chosen colour theme and the Settings → Jellyeye options
+                            SideEffect {
+                                com.github.damontecres.wholphin.ui.jellyeye.JE
+                                    .apply(appPreferences.interfacePreferences.appThemeColors)
+                                com.github.damontecres.wholphin.ui.jellyeye.JeSettings
+                                    .apply(appPreferences.jellyeyePreferences)
                             }
                             CompositionLocalProvider(LocalImageUrlService provides imageUrlService) {
                                 WholphinTheme(

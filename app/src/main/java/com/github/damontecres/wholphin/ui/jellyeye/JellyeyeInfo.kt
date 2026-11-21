@@ -1,5 +1,9 @@
 package com.github.damontecres.wholphin.ui.jellyeye
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.Animatable
 import org.jellyfin.sdk.model.serializer.toUUIDOrNull
 import androidx.compose.ui.res.stringResource
 import com.github.damontecres.wholphin.ui.detail.PlaylistDialog
@@ -250,7 +254,17 @@ private fun InfoHeader(
             .border(1.dp, JE.line, RoundedCornerShape(24.dp)),
     ) {
         val backdrop = remember(item.id) { imageUrls.getItemImageUrl(item, ImageType.BACKDROP, fillWidth = 1280) }
-        AsyncImage(model = backdrop, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        val zoom = bannerPushIn(item.id)
+        AsyncImage(
+            model = backdrop,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier =
+                Modifier.fillMaxSize().graphicsLayer {
+                    scaleX = zoom.value
+                    scaleY = zoom.value
+                },
+        )
         Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color(0xF21B1C1F), Color(0x801B1C1F), Color(0x261B1C1F)))))
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.4f to Color.Transparent, 1f to Color(0xF51B1C1F))))
 
@@ -523,7 +537,7 @@ private fun LazyListScope.episodeSection(
                     modifier =
                         Modifier
                             .clip(RoundedCornerShape(20.dp))
-                            .background(if (selected) Color(0x33E5A00D) else Color(0x12FFFFFF))
+                            .background(if (selected) JE.accent.copy(alpha = 0.20f) else Color(0x12FFFFFF))
                             .padding(horizontal = 14.dp, vertical = 6.dp),
                 )
             }
@@ -556,8 +570,8 @@ private fun EpisodeRow(
                 Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
-                    .background(if (isNext) Color(0x14E5A00D) else Color(0x08FFFFFF))
-                    .border(1.dp, if (isNext) Color(0x8CE5A00D) else Color.Transparent, RoundedCornerShape(14.dp))
+                    .background(if (isNext) JE.accent.copy(alpha = 0.08f) else Color(0x08FFFFFF))
+                    .border(1.dp, if (isNext) JE.accent.copy(alpha = 0.55f) else Color.Transparent, RoundedCornerShape(14.dp))
                     .padding(8.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -684,12 +698,23 @@ private fun PersonHeader(
             .fillMaxWidth()
             .height(JeLayout.bannerHeight)
             .clip(RoundedCornerShape(24.dp))
-            .background(Brush.linearGradient(listOf(Color(0x33E5A00D), Color(0xFF111214))))
+            .background(Brush.linearGradient(listOf(JE.accent.copy(alpha = 0.20f), Color(0xFF111214))))
             .border(1.dp, JE.line, RoundedCornerShape(24.dp)),
     ) {
         if (backdropFrom != null) {
             val url = remember(backdropFrom.id) { imageUrls.getItemImageUrl(backdropFrom, ImageType.BACKDROP, fillWidth = 1280) }
-            AsyncImage(model = url, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 0.45f })
+            val zoom = bannerPushIn(person.id)
+            AsyncImage(
+                model = url,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier =
+                    Modifier.fillMaxSize().graphicsLayer {
+                        alpha = 0.45f
+                        scaleX = zoom.value
+                        scaleY = zoom.value
+                    },
+            )
             Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color(0xF2111214), Color(0xB3111214), Color(0x40111214)))))
         }
         Row(
@@ -911,4 +936,18 @@ private fun JellyeyeOptions(
     if (!menuOpen && details == null && playlistFor == null) {
         LaunchedEffect(Unit) { onDismiss() }
     }
+}
+
+/** The banner's slow push-in: starts at normal size when the page opens and zooms in gently over about 10 seconds, then holds. */
+@Composable
+private fun bannerPushIn(key: Any): Animatable<Float, AnimationVector1D> {
+    val zoom = remember(key) { Animatable(1f) }
+    LaunchedEffect(key, JeSettings.bannerZoom) {
+        if (JeSettings.bannerZoom) {
+            zoom.animateTo(1.06f, tween(10_000, easing = LinearEasing))
+        } else {
+            zoom.snapTo(1f)
+        }
+    }
+    return zoom
 }

@@ -478,7 +478,9 @@ fun JellyeyeLibraryRecommended(
                     }
                 }
             }
-            items(state.sections, key = { it.key }) { s ->
+            val sections =
+                if (JeSettings.showBecauseYouWatched) state.sections else state.sections.filterNot { it.key.startsWith("because-") }
+            items(sections, key = { it.key }) { s ->
                 SectionTile(s.title) {
                     if (s.wide) {
                         WideGrid(s.items, now, onClick = viewModel::play)

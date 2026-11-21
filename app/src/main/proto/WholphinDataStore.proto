@@ -244,6 +244,14 @@ message ExperimentalPreferences {
   bool convert_dolby_vision_profile_7 = 6;
 }
 
+// Jellyeye's own settings (Settings → Jellyeye). Named so the defaults (false / 0) mean "on" / "standard".
+message JellyeyePreferences {
+  bool no_banner_zoom = 1;
+  int32 slide_seconds = 2;
+  bool hide_seasonal_panel = 3;
+  bool hide_because_you_watched = 4;
+}
+
 message AppPreferences {
   string current_server_id = 1 [deprecated = true];
   string current_user_id = 2 [deprecated = true];
@@ -261,4 +269,5 @@ message AppPreferences {
   PhotoPreferences photo_preferences = 12;
   MusicPreferences music_preferences = 13;
   ExperimentalPreferences experimental_preferences = 14;
+  JellyeyePreferences jellyeye_preferences = 15;
 }
