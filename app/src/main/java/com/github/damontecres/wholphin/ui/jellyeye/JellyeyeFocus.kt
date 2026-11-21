@@ -9,7 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.focus.FocusRequester
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.github.damontecres.wholphin.ui.tryRequestFocus
+import androidx.compose.ui.focus.FocusDirection
 import kotlinx.coroutines.delay
 import java.util.UUID
 
@@ -24,6 +24,14 @@ import java.util.UUID
  *  4. Safety net: the side menu only opens when you press Left or Back to open it. If focus lands on the menu
  *     by accident (a page appearing with nothing selected), it's handed back to the page instead.
  */
+
+/** Asks for focus and says whether it actually got it (false if the title isn't drawn yet, or isn't there). */
+internal fun FocusRequester.focusNow(): Boolean =
+    try {
+        requestFocus(FocusDirection.Enter)
+    } catch (ex: IllegalStateException) {
+        false
+    }
 
 /** Where you were on a page when you opened a title. Lives in the page's view model, so it survives the trip. */
 class JeReturn {
@@ -106,13 +114,13 @@ internal fun PageFocus(
         if (backTo != null) {
             list?.let { memory.scrollBack(it) }
             repeat(30) {
-                if (restore.tryRequestFocus()) return@LaunchedEffect
+                if (restore.focusNow()) return@LaunchedEffect
                 delay(40)
             }
         }
         delay(60)
         repeat(40) {
-            if (main.tryRequestFocus()) return@LaunchedEffect
+            if (main.focusNow()) return@LaunchedEffect
             delay(50)
         }
     }
@@ -131,7 +139,7 @@ object JePageFocus {
     }
 
     /** Hand focus back to the page; false if no Jellyeye page is showing (the menu then behaves as normal). */
-    fun takeBack(): Boolean = current?.tryRequestFocus() == true
+    fun takeBack(): Boolean = current?.focusNow() == true
 }
 
 /** Remembers when Left or Back was last pressed, so the menu can tell being opened on purpose from stray focus. */

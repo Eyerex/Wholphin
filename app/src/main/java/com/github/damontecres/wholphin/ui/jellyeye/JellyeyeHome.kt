@@ -134,7 +134,7 @@ val LocalMenuFocus = staticCompositionLocalOf<FocusRequester?> { null }
 /** Left (on the first title of a row, or the first button) goes into the side menu; if that can't happen, Left works as usual. */
 internal fun Modifier.leftOpensMenu(menu: FocusRequester): Modifier =
     onPreviewKeyEvent { e ->
-        e.type == KeyEventType.KeyDown && e.key == Key.DirectionLeft && menu.tryRequestFocus()
+        e.type == KeyEventType.KeyDown && e.key == Key.DirectionLeft && menu.focusNow()
     }
 
 /** One Jellyeye colour set per Wholphin colour theme (vivid versions, so rings and buttons stay punchy). */
