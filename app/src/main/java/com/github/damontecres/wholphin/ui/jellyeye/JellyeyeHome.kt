@@ -623,7 +623,7 @@ internal fun Spotlight(
         val loader = SingletonImageLoader.get(context)
         listOfNotNull(
             imageUrls.getItemImageUrl(next, ImageType.BACKDROP, fillWidth = 1280),
-            if (next.data.imageTags?.containsKey(ImageType.LOGO) == true) imageUrls.getItemImageUrl(next, ImageType.LOGO) else null,
+            logoUrl(imageUrls, next),
         ).forEach { url -> loader.enqueue(ImageRequest.Builder(context).data(url).build()) }
     }
 
@@ -683,28 +683,7 @@ internal fun Spotlight(
                     .padding(top = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.Bottom),
             ) {
-                var logoFailed by remember(item.id) { mutableStateOf(false) }
-                val logo = remember(item.id) { imageUrls.getItemImageUrl(item, ImageType.LOGO) }
-                if (logo != null && !logoFailed && item.data.imageTags?.containsKey(ImageType.LOGO) == true) {
-                    AsyncImage(
-                        model = logo,
-                        contentDescription = item.name,
-                        contentScale = ContentScale.Fit,
-                        alignment = Alignment.BottomStart,
-                        onError = { logoFailed = true },
-                        modifier = Modifier.heightIn(max = 80.dp).widthIn(max = 300.dp),
-                    )
-                } else {
-                    Text(
-                        item.name ?: "",
-                        color = Color.White,
-                        fontSize = 40.sp,
-                        lineHeight = 40.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                TitleLogo(item, maxWidth = 300.dp, textSize = 40)
                 val runMins = if (item.type == BaseItemKind.SERIES) 0L else minutesOf(item.data.runTimeTicks)
                 val meta =
                     listOfNotNull(
@@ -1046,5 +1025,57 @@ private fun SeasonPanel(
             )
         }
         PosterGrid(items, rows = 2, onClick = onClick)
+    }
+}
+
+/* ------------------------------------------------------------------
+   Title logos: asked for at about the size they're drawn (some originals are thousands of pixels and
+   several MB, too slow or too big for a Fire Stick), with the title in text until the logo is ready.
+   ------------------------------------------------------------------ */
+internal fun logoUrl(
+    imageUrls: com.github.damontecres.wholphin.services.ImageUrlService,
+    item: BaseItem,
+): String? {
+    val tag = item.data.imageTags?.get(ImageType.LOGO) ?: return null
+    return imageUrls.getItemImageUrl(itemId = item.id, imageType = ImageType.LOGO, maxWidth = 700, maxHeight = 260, tag = tag)
+}
+
+@Composable
+internal fun TitleLogo(
+    item: BaseItem,
+    maxWidth: Dp,
+    textSize: Int,
+) {
+    val imageUrls = LocalImageUrlService.current
+    val url = remember(item.id) { logoUrl(imageUrls, item) }
+    var ready by remember(item.id) { mutableStateOf(false) }
+    Box(contentAlignment = Alignment.BottomStart) {
+        if (!ready) {
+            Text(
+                item.name ?: "",
+                color = Color.White,
+                fontSize = textSize.sp,
+                lineHeight = (textSize + 2).sp,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (url != null) {
+            // loads behind the text; swaps in once it's actually there (a failed logo just leaves the text)
+            AsyncImage(
+                model = url,
+                contentDescription = item.name,
+                contentScale = ContentScale.Fit,
+                alignment = Alignment.BottomStart,
+                onSuccess = { ready = true },
+                onError = { ready = false },
+                modifier =
+                    Modifier
+                        .heightIn(max = 80.dp)
+                        .widthIn(max = maxWidth)
+                        .graphicsLayer { alpha = if (ready) 1f else 0f },
+            )
+        }
     }
 }

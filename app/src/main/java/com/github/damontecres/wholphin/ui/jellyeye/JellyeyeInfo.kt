@@ -286,28 +286,7 @@ private fun InfoHeader(
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.2.sp,
             )
-            var logoFailed by remember(item.id) { mutableStateOf(false) }
-            val logo = remember(item.id) { imageUrls.getItemImageUrl(item, ImageType.LOGO) }
-            if (logo != null && !logoFailed && item.data.imageTags?.containsKey(ImageType.LOGO) == true) {
-                AsyncImage(
-                    model = logo,
-                    contentDescription = item.name,
-                    contentScale = ContentScale.Fit,
-                    alignment = Alignment.BottomStart,
-                    onError = { logoFailed = true },
-                    modifier = Modifier.heightIn(max = 80.dp).widthIn(max = 320.dp),
-                )
-            } else {
-                Text(
-                    item.name ?: "",
-                    color = Color.White,
-                    fontSize = 38.sp,
-                    lineHeight = 40.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            TitleLogo(item, maxWidth = 320.dp, textSize = 38)
             val years =
                 if (isSeries) {
                     val start = item.data.productionYear
