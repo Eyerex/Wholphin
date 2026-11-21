@@ -1,5 +1,6 @@
 package com.github.damontecres.wholphin.ui.jellyeye
 
+import androidx.compose.runtime.MutableState
 import com.github.damontecres.wholphin.preferences.JellyeyePreferences
 import com.github.damontecres.wholphin.preferences.AppThemeColors
 import coil3.request.ImageRequest
@@ -129,9 +130,9 @@ data class JePalette(
 )
 
 private val darkText = Color(0xFF1A1A1A)
-private val JE_PALETTES =
+private val JE_PALETTES: Map<AppThemeColors, JePalette> =
     mapOf(
-        AppThemeColors.ORANGE to JePalette(JE.accent, JE.accent2, darkText, Color(0xFF16171A), Color(0xB81E2023)),
+        AppThemeColors.ORANGE to JePalette(Color(0xFFE5A00D), Color(0xFFF0B429), darkText, Color(0xFF16171A), Color(0xB81E2023)),
         AppThemeColors.BLUE to JePalette(Color(0xFF3B82F6), Color(0xFF7CB0FF), Color.White, Color(0xFF111318), Color(0xB81A1E26)),
         AppThemeColors.BOLD_BLUE to JePalette(Color(0xFF2563EB), Color(0xFF5B8DF5), Color.White, Color(0xFF0D1220), Color(0xB8141B2C)),
         AppThemeColors.GREEN to JePalette(Color(0xFF22C55E), Color(0xFF5EE08C), darkText, Color(0xFF101510), Color(0xB8182019)),
@@ -139,23 +140,23 @@ private val JE_PALETTES =
         AppThemeColors.RED to JePalette(Color(0xFFEF4444), Color(0xFFFF8A80), Color.White, Color(0xFF1A1110), Color(0xB8261A19)),
         AppThemeColors.BROWN to JePalette(Color(0xFFC9803E), Color(0xFFE6A267), darkText, Color(0xFF19120D), Color(0xB8261C15)),
         // OLED: pure black backgrounds, keeping Jellyeye's orange
-        AppThemeColors.OLED_BLACK to JePalette(JE.accent, JE.accent2, darkText, Color(0xFF000000), Color(0xB80E0E0E)),
+        AppThemeColors.OLED_BLACK to JePalette(Color(0xFFE5A00D), Color(0xFFF0B429), darkText, Color(0xFF000000), Color(0xB80E0E0E)),
     )
 
 /** Jellyeye's colours. They follow the colour theme chosen in Settings (orange unless you pick another). */
 object JE {
-    private val palette = mutableStateOf(JE_PALETTES.getValue(AppThemeColors.ORANGE))
+    private val palette: MutableState<JePalette> = mutableStateOf(JE_PALETTES.getValue(AppThemeColors.ORANGE))
 
     fun apply(theme: AppThemeColors) {
         val next = JE_PALETTES[theme] ?: JE_PALETTES.getValue(AppThemeColors.ORANGE)
         if (palette.value != next) palette.value = next
     }
 
-    val bg get() = palette.value.bg
-    val tile get() = palette.value.tile
-    val accent get() = palette.value.accent
-    val accent2 get() = palette.value.accent2
-    val onAccent get() = palette.value.onAccent
+    val bg: Color get() = palette.value.bg
+    val tile: Color get() = palette.value.tile
+    val accent: Color get() = palette.value.accent
+    val accent2: Color get() = palette.value.accent2
+    val onAccent: Color get() = palette.value.onAccent
     val line = Color(0x14FFFFFF)
     val text = Color(0xFFECEFF1)
     val soft = Color(0xFFC9CDD2)
