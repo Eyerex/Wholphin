@@ -1,5 +1,6 @@
 package com.github.damontecres.wholphin.ui.jellyeye
 
+import androidx.compose.runtime.DisposableEffect
 import com.github.damontecres.wholphin.ui.tryRequestFocus
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.FocusRequester
@@ -115,15 +116,19 @@ class JellyeyeRecommendedViewModel
 
         /** The title you last opened from here, so coming back lands on it again. */
         var lastOpened: UUID? = null
-            private set
+
+        /** True while you're away in a title opened from here (any other way of leaving forgets your place). */
+        var awayInTitle = false
 
         fun open(item: BaseItem) {
             lastOpened = item.id
+            awayInTitle = true
             navigationManager.navigateTo(item.destination())
         }
 
         fun play(item: BaseItem) {
             lastOpened = item.id
+            awayInTitle = true
             navigationManager.navigateTo(Destination.Playback(item))
         }
 
@@ -467,6 +472,13 @@ fun JellyeyeLibraryRecommended(
     viewModel: JellyeyeRecommendedViewModel = hiltViewModel(key = "jellyeye-rec-$libraryId"),
 ) {
     LaunchedEffect(libraryId) { viewModel.load(libraryId, kind) }
+    // keep your place only for coming back from a title; switching tab (or leaving any other way) resets it
+    DisposableEffect(viewModel) {
+        viewModel.awayInTitle = false
+        onDispose {
+            if (!viewModel.awayInTitle) viewModel.lastOpened = null
+        }
+    }
     val state by viewModel.state.collectAsState()
     var now by remember { mutableStateOf(LocalDateTime.now()) }
     LaunchedEffect(Unit) {

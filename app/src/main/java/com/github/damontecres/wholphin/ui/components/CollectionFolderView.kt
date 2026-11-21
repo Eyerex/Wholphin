@@ -1,5 +1,6 @@
 package com.github.damontecres.wholphin.ui.components
 
+import androidx.compose.runtime.DisposableEffect
 import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -674,7 +675,11 @@ class CollectionFolderViewModel
             }
         }
 
+        /** Jellyeye: true while you're away in a title opened from here, so your place is kept for when you come back. */
+        var keepPosition = false
+
         override fun navigateTo(destination: Destination) {
+            keepPosition = true
             release()
             navigationManager.navigateTo(destination)
         }
@@ -841,6 +846,14 @@ fun CollectionFolderView(
         },
 ) {
     val state by viewModel.state.collectAsState()
+    // Jellyeye: your place in the grid is kept while you look at a title and come back; leaving any other way
+    // (another tab, for instance) starts it from the first title again next time
+    DisposableEffect(viewModel) {
+        viewModel.keepPosition = false
+        onDispose {
+            if (!viewModel.keepPosition) viewModel.position = 0
+        }
+    }
     LifecycleResumeEffect(itemId) {
         viewModel.onResumePage()
 
