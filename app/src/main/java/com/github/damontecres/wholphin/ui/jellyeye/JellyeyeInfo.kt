@@ -596,6 +596,7 @@ private fun EpisodeRow(
     onToggleWatched: () -> Unit,
     focusRequester: FocusRequester?,
 ) {
+    val imageUrls = LocalImageUrlService.current
     val isChosen = ep.id == state.chosenEpisodeId
     val isNext = isChosen || (state.chosenEpisodeId == null && ep.id == state.nextEpisode?.id)
     val eud = ep.data.userData
