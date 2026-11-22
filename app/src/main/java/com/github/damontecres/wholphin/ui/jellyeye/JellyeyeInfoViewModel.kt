@@ -421,10 +421,6 @@ class JellyeyeInfoViewModel
 
         fun sendMediaReport(itemId: UUID) = serverReportService.sendMediaReportFor(itemId)
 
-        fun deleteThis(item: BaseItem) {
-            deleteItem(context, mediaManagementService, item) { navigationManager.goBack() }
-        }
-
         /** A collection played start to finish in release order, or shuffled. */
         fun playCollection(shuffle: Boolean) {
             val item = _state.value.item ?: return
@@ -519,13 +515,6 @@ class JellyeyeInfoViewModel
         }
 
         fun closeOptions() = _state.update { it.copy(menuItem = null, menuStreams = null) }
-
-        /** Deleting an episode keeps you on the show (deleting the page's own title goes back, as before). */
-        fun deleteEpisode(episode: BaseItem) {
-            deleteItem(context, mediaManagementService, episode) {
-                viewModelScope.launchIO { refreshAfterWatched() }
-            }
-        }
 
         private suspend fun refreshItem(itemId: UUID) {
             val item = BaseItem(api.libraryApi.getItem(itemId).content, false)

@@ -950,7 +950,8 @@ private fun JellyeyeOptions(
                     playlistFor = id
                 },
                 onSendMediaInfo = { viewModel.sendMediaReport(it) },
-                onDeleteItem = { if (it.type == BaseItemKind.EPISODE) viewModel.deleteEpisode(it) else viewModel.deleteThis(it) },
+                // Jellyeye: no deleting from the TV (the option never appears; this is just a safe no-op)
+                onDeleteItem = {},
                 onChooseVersion = { i, source -> source.id?.toUUIDOrNull()?.let { viewModel.savePlayVersion(i, it) } },
                 onChooseTracks = { r -> viewModel.saveTrackSelection(r.item, r.itemPlayback, r.trackIndex, r.streamType) },
                 onClearChosenStreams = viewModel::clearChosenStreams,
@@ -969,7 +970,7 @@ private fun JellyeyeOptions(
                     chosenStreams = chosenStreams,
                     showGoTo = false,
                     showStreamChoices = item.type != BaseItemKind.SERIES,
-                    canDelete = canDelete,
+                    canDelete = false,
                     canRemoveContinueWatching = false,
                     canRemoveNextUp = false,
                     actions = actions,

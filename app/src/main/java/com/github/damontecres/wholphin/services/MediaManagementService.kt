@@ -58,6 +58,8 @@ class MediaManagementService
             item: BaseItem,
             appPreferences: AppPreferences,
         ): Boolean {
+            // Jellyeye: a player never deletes anything, so no delete option appears anywhere in the app
+            if (JELLYEYE_NO_DELETE) return false
             Timber.v("canDelete %s: %s", item.id, item.canDelete)
             val enabled = appPreferences.interfacePreferences.enableMediaManagement
             return enabled &&
@@ -87,6 +89,8 @@ class MediaManagementService
          * This item will be sent through [deletedItemFlow] for other services or view models to react.
          */
         suspend fun deleteItem(item: BaseItem): DeleteResult {
+            // Jellyeye: refuse outright, even if something asks (belt and braces with canDelete)
+            if (JELLYEYE_NO_DELETE) return DeleteResult.Error(IllegalStateException("Deleting is turned off in Jellyeye"))
             try {
                 Timber.i("Deleting %s", item.id)
                 api.libraryApi.deleteItem(item.id)
@@ -134,3 +138,6 @@ fun ViewModel.deleteItem(
         }
     }
 }
+
+/** Jellyeye: deleting from the TV is switched off completely. */
+private const val JELLYEYE_NO_DELETE = true
