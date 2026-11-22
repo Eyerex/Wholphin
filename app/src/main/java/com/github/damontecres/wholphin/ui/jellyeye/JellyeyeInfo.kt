@@ -1,5 +1,8 @@
 package com.github.damontecres.wholphin.ui.jellyeye
 
+import com.github.damontecres.wholphin.data.ChosenStreams
+import com.github.damontecres.wholphin.ui.components.DialogPopup
+import com.github.damontecres.wholphin.ui.components.DialogItem
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.AnimationVector1D
@@ -107,6 +110,8 @@ fun JellyeyeInfo(
     LaunchedEffect(itemId) { viewModel.load(itemId, seasonEpisode) }
     val state by viewModel.state.collectAsState()
     var showMenu by remember { mutableStateOf(false) }
+    var episodeChoice by remember { mutableStateOf<BaseItem?>(null) }
+    var playEpisodeFromMenu: (BaseItem) -> Unit by remember { mutableStateOf({ _: BaseItem -> }) }
     var now by remember { mutableStateOf(LocalDateTime.now()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -118,8 +123,23 @@ fun JellyeyeInfo(
     Box(modifier = modifier.fillMaxSize().background(JE.bg)) {
         state.item?.let { current ->
             if (showMenu) {
-                JellyeyeOptions(current, state, viewModel, onDismiss = { showMenu = false })
+                JellyeyeOptions(current, state.chosenStreams, state.canDelete, viewModel, onDismiss = { showMenu = false })
             }
+        }
+        // one episode's full options (from its quick menu's "More options")
+        state.menuItem?.let { episode ->
+            JellyeyeOptions(episode, state.menuStreams, state.menuCanDelete, viewModel, onDismiss = viewModel::closeOptions)
+        }
+        // an episode's quick menu: Menu button or a long press on the episode
+        episodeChoice?.let { episode ->
+            EpisodeQuickMenu(
+                episode = episode,
+                onDismiss = { episodeChoice = null },
+                onPlay = { playEpisodeFromMenu(episode) },
+                onToggleWatched = { viewModel.toggleWatched(episode) },
+                onPreviousWatched = { viewModel.markPreviousWatched(episode) },
+                onMoreOptions = { viewModel.optionsFor(episode) },
+            )
         }
         val item = state.item
         if (item == null) {
@@ -148,6 +168,7 @@ fun JellyeyeInfo(
         val open = { target: BaseItem -> memory.leaving(target.id, listState); viewModel.open(target) }
         val openPerson = { id: UUID -> memory.leaving(id, listState); viewModel.openPerson(id) }
         val playEpisode = { ep: BaseItem -> memory.leaving(ep.id, listState); viewModel.play(ep) }
+        playEpisodeFromMenu = playEpisode
         val scope = rememberCoroutineScope()
         // anything focused in the header brings the whole header (the top of the page) back into view
         val showTop =
@@ -190,7 +211,7 @@ fun JellyeyeInfo(
                         posterSection("collection", "In this collection · ${state.films.size}", state.films, open, focusRequesters = focusMap)
                     }
                     if (item.type == BaseItemKind.SERIES && state.seasons.isNotEmpty()) {
-                        episodeSection(state, viewModel, playEpisode, focusMap)
+                        episodeSection(state, viewModel, playEpisode, { episodeChoice = it }, focusMap)
                     }
                     val cast =
                         item.data.people.orEmpty().filter {
@@ -508,35 +529,60 @@ private fun LazyListScope.episodeSection(
     state: JellyeyeInfoState,
     viewModel: JellyeyeInfoViewModel,
     onPlay: (BaseItem) -> Unit,
+    onMenu: (BaseItem) -> Unit,
     focusRequesters: Map<UUID, FocusRequester>,
 ) {
     item(key = "episodes-top") {
         PanelTop("Episodes") {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        state.seasons.forEach { season ->
-            val selected = season.id == state.seasonId
-            JeFocusable(onClick = { viewModel.selectSeason(season.id) }, corner = 20.dp, leftEdge = season === state.seasons.first()) {
-                Text(
-                    season.name ?: "",
-                    color = if (selected) JE.accent2 else JE.text,
-                    fontSize = 13.sp,
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
-                    modifier =
-                        Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(if (selected) JE.accent.copy(alpha = 0.20f) else Color(0x12FFFFFF))
-                            .padding(horizontal = 14.dp, vertical = 6.dp),
-                )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                itemVerticalAlignment = Alignment.CenterVertically,
+            ) {
+                state.seasons.forEach { season ->
+                    val selected = season.id == state.seasonId
+                    JeFocusable(onClick = { viewModel.selectSeason(season.id) }, corner = 20.dp, leftEdge = season === state.seasons.first()) {
+                        Text(
+                            season.name ?: "",
+                            color = if (selected) JE.accent2 else JE.text,
+                            fontSize = 13.sp,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+                            modifier =
+                                Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(if (selected) JE.accent.copy(alpha = 0.20f) else Color(0x12FFFFFF))
+                                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                        )
+                    }
+                }
+                // the whole of the season you're looking at, watched or not
+                state.seasons.firstOrNull { it.id == state.seasonId }?.let { season ->
+                    val done = season.data.userData?.played == true
+                    Spacer(Modifier.width(10.dp))
+                    PillButton(
+                        if (done) "✓  Season watched" else "Mark season watched",
+                        onClick = { viewModel.toggleWatched(season) },
+                    )
+                }
+            }
+            if (state.episodes.isEmpty()) {
+                Text("Loading episodes…", color = JE.dim, fontSize = 13.sp, modifier = Modifier.padding(8.dp))
+            } else {
+                Text("Right for the ✓ on an episode · hold OK or press ☰ for more", color = JE.dim, fontSize = 11.sp)
             }
         }
     }
-    if (state.episodes.isEmpty()) {
-        Text("Loading episodes…", color = JE.dim, fontSize = 13.sp, modifier = Modifier.padding(8.dp))
-    }
-        }
-    }
     itemsIndexed(state.episodes, key = { _, ep -> "ep-${ep.id}" }) { _, ep ->
-        PanelRow { EpisodeRow(ep, state, onPlay, focusRequesters[ep.id]) }
+        PanelRow {
+            EpisodeRow(
+                ep = ep,
+                state = state,
+                onPlay = onPlay,
+                onMenu = onMenu,
+                onToggleWatched = { viewModel.toggleWatched(ep) },
+                focusRequester = focusRequesters[ep.id],
+            )
+        }
     }
     item(key = "episodes-end") { PanelBottom() }
 }
@@ -546,13 +592,21 @@ private fun EpisodeRow(
     ep: BaseItem,
     state: JellyeyeInfoState,
     onPlay: (BaseItem) -> Unit,
+    onMenu: (BaseItem) -> Unit,
+    onToggleWatched: () -> Unit,
     focusRequester: FocusRequester?,
 ) {
-    val imageUrls = LocalImageUrlService.current
     val isChosen = ep.id == state.chosenEpisodeId
     val isNext = isChosen || (state.chosenEpisodeId == null && ep.id == state.nextEpisode?.id)
     val eud = ep.data.userData
-    JeTile(onClick = { onPlay(ep) }, modifier = Modifier.fillMaxWidth(), focusRequester = focusRequester, leftEdge = true) { focused ->
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+    JeTile(
+        onClick = { onPlay(ep) },
+        onLongClick = { onMenu(ep) },
+        modifier = Modifier.weight(1f),
+        focusRequester = focusRequester,
+        leftEdge = true,
+    ) { focused ->
         Row(
             modifier =
                 Modifier
@@ -602,6 +656,33 @@ private fun EpisodeRow(
                     Text(it, color = JE.soft, fontSize = 12.sp, lineHeight = 17.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
             }
+        }
+    }
+    WatchedTick(watched = eud?.played == true, onClick = onToggleWatched)
+    }
+}
+
+/** The round ✓ at the end of an episode: filled when watched, an outline when not. Select to switch. */
+@Composable
+private fun WatchedTick(
+    watched: Boolean,
+    onClick: () -> Unit,
+) {
+    JeFocusable(onClick = onClick, corner = 24.dp) { focused ->
+        Box(
+            Modifier
+                .size(38.dp)
+                .clip(CircleShape)
+                .background(if (watched) JE.accent else Color(0x14FFFFFF))
+                .border(1.dp, if (watched) JE.accent else Color(0x33FFFFFF), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                "✓",
+                color = if (watched) JE.onAccent else if (focused) Color.White else JE.dim,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.ExtraBold,
+            )
         }
     }
 }
@@ -846,7 +927,8 @@ private fun Stat(
 @Composable
 private fun JellyeyeOptions(
     item: BaseItem,
-    state: JellyeyeInfoState,
+    chosenStreams: ChosenStreams?,
+    canDelete: Boolean,
     viewModel: JellyeyeInfoViewModel,
     onDismiss: () -> Unit,
     playlistViewModel: AddPlaylistViewModel = hiltViewModel(),
@@ -867,7 +949,7 @@ private fun JellyeyeOptions(
                     playlistFor = id
                 },
                 onSendMediaInfo = { viewModel.sendMediaReport(it) },
-                onDeleteItem = viewModel::deleteThis,
+                onDeleteItem = { if (it.type == BaseItemKind.EPISODE) viewModel.deleteEpisode(it) else viewModel.deleteThis(it) },
                 onChooseVersion = { i, source -> source.id?.toUUIDOrNull()?.let { viewModel.savePlayVersion(i, it) } },
                 onChooseTracks = { r -> viewModel.saveTrackSelection(r.item, r.itemPlayback, r.trackIndex, r.streamType) },
                 onClearChosenStreams = viewModel::clearChosenStreams,
@@ -883,10 +965,10 @@ private fun JellyeyeOptions(
                 ContextMenu.ForBaseItem(
                     fromLongClick = false,
                     item = item,
-                    chosenStreams = state.chosenStreams,
+                    chosenStreams = chosenStreams,
                     showGoTo = false,
                     showStreamChoices = item.type != BaseItemKind.SERIES,
-                    canDelete = state.canDelete,
+                    canDelete = canDelete,
                     canRemoveContinueWatching = false,
                     canRemoveNextUp = false,
                     actions = actions,
@@ -945,4 +1027,42 @@ private fun bannerPushIn(key: Any): Animatable<Float, AnimationVector1D> {
         }
     }
     return zoom
+}
+
+/** An episode's quick menu (Menu button or holding OK): play it, tick it, catch up to it, or every option. */
+@Composable
+private fun EpisodeQuickMenu(
+    episode: BaseItem,
+    onDismiss: () -> Unit,
+    onPlay: () -> Unit,
+    onToggleWatched: () -> Unit,
+    onPreviousWatched: () -> Unit,
+    onMoreOptions: () -> Unit,
+) {
+    val watched = episode.data.userData?.played == true
+    val resume = episode.resumeMs > 0
+    val name =
+        listOfNotNull(
+            episode.data.parentIndexNumber?.let { s -> episode.data.indexNumber?.let { e -> "S$s:E$e" } },
+            episode.name,
+        ).joinToString(" · ")
+    val items =
+        remember(episode.id, watched) {
+            listOf(
+                DialogItem(if (resume) "Resume" else "Play", R.string.fa_play, dismissOnClick = true) { onPlay() },
+                DialogItem(if (watched) "Mark as unwatched" else "Mark as watched", if (watched) R.string.fa_eye_slash else R.string.fa_eye, dismissOnClick = true) {
+                    onToggleWatched()
+                },
+                DialogItem("Mark all previous episodes as watched", R.string.fa_check, dismissOnClick = true) { onPreviousWatched() },
+                DialogItem("More options…", R.string.fa_ellipsis, dismissOnClick = true) { onMoreOptions() },
+            )
+        }
+    DialogPopup(
+        showDialog = true,
+        title = name,
+        dialogItems = items,
+        onDismissRequest = onDismiss,
+        dismissOnClick = true,
+        elevation = 3.dp,
+    )
 }

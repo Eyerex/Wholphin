@@ -1,5 +1,6 @@
 package com.github.damontecres.wholphin.ui.jellyeye
 
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.key
@@ -265,6 +266,8 @@ internal fun JeTile(
     modifier: Modifier = Modifier,
     focusRequester: FocusRequester? = null,
     leftEdge: Boolean = false,
+    // holding OK, or the remote's Menu (☰) button
+    onLongClick: (() -> Unit)? = null,
     content: @Composable (focused: Boolean) -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -275,7 +278,23 @@ internal fun JeTile(
             modifier
                 .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
                 .then(if (menu != null) Modifier.leftOpensMenu(menu) else Modifier)
-                .clickable(interactionSource = interaction, indication = null, onClick = onClick),
+                .then(
+                    if (onLongClick != null) {
+                        Modifier
+                            .onPreviewKeyEvent { e ->
+                                val menu = e.key == Key.Menu
+                                if (menu && e.type == KeyEventType.KeyUp) onLongClick()
+                                menu
+                            }.combinedClickable(
+                                interactionSource = interaction,
+                                indication = null,
+                                onClick = onClick,
+                                onLongClick = onLongClick,
+                            )
+                    } else {
+                        Modifier.clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                    },
+                ),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         content(focused)

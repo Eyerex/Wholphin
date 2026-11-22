@@ -65,6 +65,10 @@ data class JellyeyeInfoState(
     val canDelete: Boolean = false,
     // collections: a film series (kept in release order) or a themed mix (random banner, A-Z grid)
     val collectionInOrder: Boolean = true,
+    // the options pop-up for one episode (null when not showing)
+    val menuItem: BaseItem? = null,
+    val menuStreams: ChosenStreams? = null,
+    val menuCanDelete: Boolean = false,
 )
 
 @HiltViewModel
@@ -219,37 +223,40 @@ class JellyeyeInfoViewModel
                 emptyList()
             }
 
+        private suspend fun fetchSeasons(seriesId: UUID): List<BaseItem> =
+            try {
+                api.showApi
+                    .getSeasons(GetSeasonsRequest(seriesId = seriesId, userId = serverRepository.currentUser?.id, enableUserData = true))
+                    .content
+                    .items
+                    .map { BaseItem(it, false) }
+            } catch (ex: Exception) {
+                emptyList()
+            }
+
+        private suspend fun fetchNextUp(seriesId: UUID): BaseItem? =
+            try {
+                api.showApi
+                    .getNextUp(
+                        GetNextUpRequest(
+                            userId = serverRepository.currentUser?.id,
+                            seriesId = seriesId,
+                            limit = 1,
+                            enableUserData = true,
+                            enableResumable = true,
+                            fields = rowFields,
+                        ),
+                    ).content
+                    .items
+                    .firstOrNull()
+                    ?.let { BaseItem(it, false) }
+            } catch (ex: Exception) {
+                null
+            }
+
         private suspend fun loadSeries(series: BaseItem) {
-            val userId = serverRepository.currentUser?.id
-            val seasons =
-                try {
-                    api.showApi
-                        .getSeasons(GetSeasonsRequest(seriesId = series.id, userId = userId, enableUserData = true))
-                        .content
-                        .items
-                        .map { BaseItem(it, false) }
-                } catch (ex: Exception) {
-                    emptyList()
-                }
-            val next =
-                try {
-                    api.showApi
-                        .getNextUp(
-                            GetNextUpRequest(
-                                userId = userId,
-                                seriesId = series.id,
-                                limit = 1,
-                                enableUserData = true,
-                                enableResumable = true,
-                                fields = rowFields,
-                            ),
-                        ).content
-                        .items
-                        .firstOrNull()
-                        ?.let { BaseItem(it, false) }
-                } catch (ex: Exception) {
-                    null
-                }
+            val seasons = fetchSeasons(series.id)
+            val next = fetchNextUp(series.id)
             val seasonId =
                 seasonEpisode?.seasonId?.takeIf { id -> seasons.any { it.id == id } }
                     ?: next?.data?.seasonId
@@ -257,6 +264,22 @@ class JellyeyeInfoViewModel
                     ?: seasons.firstOrNull()?.id
             _state.update { it.copy(seasons = seasons, nextEpisode = next, seasonId = seasonId) }
             if (seasonId != null) loadEpisodes(series.id, seasonId)
+        }
+
+        /** After marking things watched: the page's title, and for a show its seasons, Up next and this season's episodes. */
+        private suspend fun refreshAfterWatched() {
+            val item = _state.value.item ?: return
+            refreshItem(item.id)
+            when (item.type) {
+                BaseItemKind.SERIES -> {
+                    val seasons = fetchSeasons(item.id)
+                    val next = fetchNextUp(item.id)
+                    _state.update { it.copy(seasons = seasons, nextEpisode = next) }
+                    _state.value.seasonId?.let { loadEpisodes(item.id, it) }
+                }
+                BaseItemKind.BOX_SET -> loadCollection(item.id)
+                else -> {}
+            }
         }
 
         private suspend fun loadEpisodes(
@@ -339,7 +362,7 @@ class JellyeyeInfoViewModel
             viewModelScope.launchIO {
                 try {
                     favoriteWatchManager.setWatched(itemId, played)
-                    _state.value.item?.let { refreshItem(it.id) }
+                    refreshAfterWatched()
                 } catch (ex: Exception) {
                     Timber.w(ex, "Jellyeye: watched failed")
                 }
@@ -368,7 +391,8 @@ class JellyeyeInfoViewModel
                 val prefs = userPreferencesService.getCurrent()
                 val result = itemPlaybackRepository.savePlayVersion(item.id, sourceId)
                 val chosen = result?.let { itemPlaybackRepository.getChosenItemFromPlayback(item, it, prefs) }
-                _state.update { it.copy(chosenStreams = chosen) }
+                // the episode's own pop-up, or the page's
+                _state.update { if (it.menuItem?.id == item.id) it.copy(menuStreams = chosen) else it.copy(chosenStreams = chosen) }
             }
         }
 
@@ -382,14 +406,16 @@ class JellyeyeInfoViewModel
                 val prefs = userPreferencesService.getCurrent()
                 val result = itemPlaybackRepository.saveTrackSelection(item = item, itemPlayback = itemPlayback, trackIndex = trackIndex, type = type)
                 val chosen = itemPlaybackRepository.getChosenItemFromPlayback(item, result, prefs)
-                _state.update { it.copy(chosenStreams = chosen) }
+                // the episode's own pop-up, or the page's
+                _state.update { if (it.menuItem?.id == item.id) it.copy(menuStreams = chosen) else it.copy(chosenStreams = chosen) }
             }
         }
 
         fun clearChosenStreams(chosenStreams: ChosenStreams?) {
             viewModelScope.launchIO {
                 itemPlaybackRepository.deleteChosenStreams(chosenStreams)
-                _state.value.item?.let { loadOptions(it) }
+                val episode = _state.value.menuItem
+                if (episode != null) optionsFor(episode) else _state.value.item?.let { loadOptions(it) }
             }
         }
 
@@ -432,13 +458,72 @@ class JellyeyeInfoViewModel
             viewModelScope.launchIO {
                 try {
                     favoriteWatchManager.setWatched(item.id, on)
-                    refreshItem(item.id)
-                    val seasonId = _state.value.seasonId
-                    if (item.type == BaseItemKind.SERIES && seasonId != null) loadEpisodes(item.id, seasonId)
-                    if (item.type == BaseItemKind.BOX_SET) loadCollection(item.id)
+                    refreshAfterWatched()
                 } catch (ex: Exception) {
                     Timber.w(ex, "Jellyeye: watched failed")
                 }
+            }
+        }
+
+        /* ---------------- single episodes and seasons ---------------- */
+
+        /** Tick or untick one episode (or a whole season: a season's id marks every episode in it). */
+        fun toggleWatched(target: BaseItem) = setWatched(target.id, target.data.userData?.played != true)
+
+        /** Every episode before this one (earlier seasons included) marked watched: for catching up on a show seen elsewhere. */
+        fun markPreviousWatched(episode: BaseItem) {
+            val show = _state.value.item ?: return
+            viewModelScope.launchIO {
+                try {
+                    val all =
+                        api.showApi
+                            .getEpisodes(
+                                GetEpisodesRequest(
+                                    seriesId = show.id,
+                                    userId = serverRepository.currentUser?.id,
+                                    enableUserData = true,
+                                ),
+                            ).content
+                            .items
+                    val at = all.indexOfFirst { it.id == episode.id }
+                    if (at > 0) {
+                        all
+                            .take(at)
+                            .filter { it.userData?.played != true }
+                            .forEach { favoriteWatchManager.setWatched(it.id, true) }
+                    }
+                    refreshAfterWatched()
+                } catch (ex: Exception) {
+                    Timber.w(ex, "Jellyeye: marking previous episodes failed")
+                }
+            }
+        }
+
+        /** The full options pop-up for one episode: its own track/version choices and delete permission. */
+        fun optionsFor(episode: BaseItem) {
+            viewModelScope.launchIO {
+                val chosen =
+                    try {
+                        itemPlaybackRepository.getSelectedTracks(episode.id, episode, userPreferencesService.getCurrent())
+                    } catch (ex: Exception) {
+                        null
+                    }
+                val canDelete =
+                    try {
+                        mediaManagementService.canDelete(episode)
+                    } catch (ex: Exception) {
+                        false
+                    }
+                _state.update { it.copy(menuItem = episode, menuStreams = chosen, menuCanDelete = canDelete) }
+            }
+        }
+
+        fun closeOptions() = _state.update { it.copy(menuItem = null, menuStreams = null) }
+
+        /** Deleting an episode keeps you on the show (deleting the page's own title goes back, as before). */
+        fun deleteEpisode(episode: BaseItem) {
+            deleteItem(context, mediaManagementService, episode) {
+                viewModelScope.launchIO { refreshAfterWatched() }
             }
         }
 
