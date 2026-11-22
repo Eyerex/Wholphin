@@ -2,7 +2,6 @@
 
 package com.github.damontecres.wholphin.ui.playback.overlay
 
-import androidx.tv.material3.ButtonDefaults
 import androidx.compose.foundation.shape.CircleShape
 import android.view.Gravity
 import androidx.annotation.DrawableRes
@@ -491,7 +490,7 @@ fun PlaybackButton(
     Button(
         enabled = enabled,
         onClick = onClick,
-        shape = ButtonDefaults.shape(CircleShape),
+        shape = ClickableSurfaceDefaults.shape(CircleShape),
         colors =
             ClickableSurfaceDefaults.colors(
                 containerColor = Color(0x33FFFFFF),
@@ -530,7 +529,7 @@ fun PlaybackFaButton(
     Button(
         enabled = enabled,
         onClick = onClick,
-        shape = ButtonDefaults.shape(CircleShape),
+        shape = ClickableSurfaceDefaults.shape(CircleShape),
         colors =
             ClickableSurfaceDefaults.colors(
                 containerColor = Color(0x33FFFFFF),
