@@ -10,4 +10,6 @@
         <item>8 seconds</item>
         <item>12 seconds</item>
     </string-array>
+    <!-- Font Awesome "circle-info", for the player's info button -->
+    <string name="fa_circle_info" translatable="false">&#xf05a;</string>
 </resources>

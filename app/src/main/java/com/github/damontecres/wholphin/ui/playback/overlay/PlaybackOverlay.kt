@@ -135,10 +135,12 @@ fun PlaybackOverlay(
                 remember {
                     Brush.verticalGradient(
                         colors =
+                            // Jellyeye: a deeper fade behind the controls, so the title and buttons read clearly
                             listOf(
                                 Color.Transparent,
-                                Color.Black.copy(alpha = 0.5f),
-                                Color.Black.copy(alpha = 0.80f),
+                                Color.Black.copy(alpha = 0.35f),
+                                Color.Black.copy(alpha = 0.75f),
+                                Color.Black.copy(alpha = 0.92f),
                             ),
                     )
                 }

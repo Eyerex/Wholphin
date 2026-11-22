@@ -152,62 +152,16 @@ fun AppScreensaverContent(
             null,
             is ScreensaverItem.CurrentItem,
             -> {
-                AsyncImage(
-                    model =
-                        ImageRequest
-                            .Builder(LocalContext.current)
-                            .data(currentItem?.backdropUrl)
-                            .transitionFactory(CrossFadeFactory(2000.milliseconds))
-                            .useExistingImageAsPlaceholder(true)
-                            .build(),
-                    contentDescription = null,
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .graphicsLayer {
-                                scaleX = scale
-                                scaleY = scale
-                            },
+                // Jellyeye: backdrop slowly pushing in, logo and details bottom-left, a big clock bottom-right
+                com.github.damontecres.wholphin.ui.jellyeye.JellyeyeScreensaverSlide(
+                    item = (currentItem as? ScreensaverItem.CurrentItem)?.item,
+                    backdropUrl = currentItem?.backdropUrl,
+                    title = currentItem?.title ?: "",
+                    showClock = showClock,
+                    animate = animate,
+                    slideMs = duration.inWholeMilliseconds,
+                    modifier = Modifier.fillMaxSize(),
                 )
-
-                var logoError by remember(currentItem) { mutableStateOf(false) }
-                if (!logoError) {
-                    AsyncImage(
-                        model =
-                            ImageRequest
-                                .Builder(LocalContext.current)
-                                .data(currentItem?.logoUrl)
-                                .transitionFactory(CrossFadeFactory(750.milliseconds))
-                                .build(),
-                        contentDescription = "Logo",
-                        onError = {
-                            logoError = true
-                        },
-                        modifier =
-                            Modifier
-                                .align(Alignment.BottomStart)
-                                .size(width = 240.dp, height = 120.dp)
-                                .padding(16.dp),
-                    )
-                } else {
-                    Box(
-                        modifier =
-                            Modifier
-                                .align(Alignment.BottomStart)
-                                .padding(16.dp)
-                                .fillMaxWidth(.5f)
-                                .fillMaxHeight(.3f),
-                    ) {
-                        Text(
-                            text = currentItem?.title ?: "",
-                            color = MaterialTheme.colorScheme.onSurface,
-                            style = MaterialTheme.typography.displaySmall,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.align(Alignment.BottomStart),
-                        )
-                    }
-                }
             }
         }
 
@@ -225,7 +179,8 @@ fun AppScreensaverContent(
                     }
                 }
             }
-        Canvas(Modifier.fillMaxSize()) {
+        val ownSlide = currentItem == null || currentItem is ScreensaverItem.CurrentItem
+        if (!ownSlide) Canvas(Modifier.fillMaxSize()) {
             drawRect(
                 brush = largeRadialGradient,
                 blendMode = BlendMode.Multiply,
@@ -245,7 +200,7 @@ fun AppScreensaverContent(
                 )
             }
         }
-        if (showClock) {
+        if (showClock && !ownSlide) {
             TimeDisplay()
         }
     }

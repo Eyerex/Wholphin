@@ -63,6 +63,9 @@ enum class PlaybackDialogType {
     VIDEO_SCALE,
     SUBTITLE_DELAY,
     BITRATE,
+
+    // Jellyeye: about what's playing (shown by the playback page itself)
+    INFO,
 }
 
 data class PlaybackSettings(
@@ -106,6 +109,10 @@ fun PlaybackDialog(
     when (type) {
         PlaybackDialogType.DEBUG -> {
             throw IllegalStateException("Should not open a dialog with " + PlaybackDialogType.DEBUG)
+        }
+
+        PlaybackDialogType.INFO -> {
+            // drawn by the playback page (JellyeyePlaybackInfo)
         }
 
         PlaybackDialogType.CAPTIONS -> {

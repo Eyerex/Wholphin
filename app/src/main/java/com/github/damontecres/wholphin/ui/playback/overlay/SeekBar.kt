@@ -200,7 +200,8 @@ private fun SeekBarDisplay(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    val color = MaterialTheme.colorScheme.border
+    // Jellyeye: the played part in the theme colour
+    val color = com.github.damontecres.wholphin.ui.jellyeye.JE.accent
     val onSurface = MaterialTheme.colorScheme.onSurface
 
     val isFocused by interactionSource.collectIsFocusedAsState()

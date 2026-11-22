@@ -1,5 +1,6 @@
 package com.github.damontecres.wholphin
 
+import androidx.compose.runtime.SideEffect
 import android.service.dreams.DreamService
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -104,6 +105,8 @@ class WholphinDreamService :
                                 debugLogging = false,
                                 enableCache = true,
                             )
+                            // Jellyeye's colours for the screensaver too
+                            SideEffect { com.github.damontecres.wholphin.ui.jellyeye.JE.apply(prefs.interfacePreferences.appThemeColors) }
                             WholphinTheme(appThemeColors = prefs.interfacePreferences.appThemeColors) {
                                 ProvideLocalClock {
                                     val screensaverPrefs = prefs.interfacePreferences.screensaverPreference

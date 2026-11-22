@@ -1,5 +1,6 @@
 package com.github.damontecres.wholphin.ui.playback
 
+import org.jellyfin.sdk.model.api.BaseItemKind
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -467,6 +468,13 @@ fun PlaybackPageContent(
                             .align(Alignment.Center),
                 )
             }
+            // Jellyeye: after a few seconds paused, a calm screen with what you're watching and when it ends
+            com.github.damontecres.wholphin.ui.jellyeye.JellyeyePauseScreen(
+                player = player,
+                item = state.currentPlayback?.item,
+                controlsVisible = controlsVisible || skipIndicatorDuration != 0L,
+                modifier = Modifier.fillMaxSize(),
+            )
 
             // The playback controls
 
@@ -669,33 +677,35 @@ fun PlaybackPageContent(
                         }
                     }
                 }
-                NextUpEpisode(
-                    title =
-                        listOfNotNull(
-                            it.data.seasonEpisode,
-                            it.name,
-                        ).joinToString(" - "),
-                    description = it.data.overview,
-                    imageUrl = LocalImageUrlService.current.rememberImageUrl(it),
-                    aspectRatio = it.aspectRatio ?: AspectRatios.WIDE,
-                    onClick = {
+                // Jellyeye: the next episode as a card, with Play now (and its countdown) and Back to the show
+                val seriesId = it.data.seriesId
+                com.github.damontecres.wholphin.ui.jellyeye.JellyeyeUpNext(
+                    next = it,
+                    timeLeftSeconds = if (autoPlayEnabled) timeLeft else null,
+                    onPlay = {
                         viewModel.reportInteraction()
                         controllerViewState.hideControls()
                         viewModel.playNextUp()
                     },
-                    timeLeft = if (autoPlayEnabled) timeLeft.seconds else null,
-                    runtime = it.data.runTimeTicks?.ticks,
+                    onBackToShow =
+                        seriesId?.let { sid ->
+                            {
+                                autoPlayEnabled = false
+                                val nav = viewModel.navigationManager
+                                nav.goBack()
+                                val top = nav.backStack.lastOrNull()
+                                val atShow =
+                                    (top is Destination.MediaItem && top.itemId == sid) ||
+                                        (top is Destination.SeriesOverview && top.itemId == sid)
+                                if (!atShow) nav.navigateTo(Destination.MediaItem(sid, BaseItemKind.SERIES))
+                            }
+                        },
                     modifier =
                         Modifier
                             .padding(8.dp)
-//                                    .height(128.dp)
                             .fillMaxHeight(1 - playerSize)
-                            .fillMaxWidth(.66f)
-                            .align(Alignment.BottomCenter)
-                            .background(
-                                MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp),
-                                shape = RoundedCornerShape(8.dp),
-                            ),
+                            .fillMaxWidth(.72f)
+                            .align(Alignment.BottomCenter),
                 )
             }
         }
@@ -738,7 +748,21 @@ fun PlaybackPageContent(
         }
     }
 
-    playbackDialog?.let { type ->
+    playbackDialog?.takeIf { it == PlaybackDialogType.INFO }?.let {
+        val playing = state.currentPlayback?.item
+        if (playing == null) {
+            playbackDialog = null
+        } else {
+            com.github.damontecres.wholphin.ui.jellyeye.JellyeyePlaybackInfo(
+                playing = playing,
+                onDismiss = {
+                    playbackDialog = null
+                    if (controllerViewState.controlsVisible) controllerViewState.pulseControls()
+                },
+            )
+        }
+    }
+    playbackDialog?.takeIf { it != PlaybackDialogType.INFO }?.let { type ->
         PlaybackDialog(
             type = type,
             settings =

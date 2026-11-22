@@ -70,6 +70,7 @@ fun PlaybackController(
         modifier = modifier,
     ) {
         Controller(
+            item = item,
             title = item?.title,
             subtitle = item?.subtitleLong,
             player = player,
@@ -132,6 +133,7 @@ internal val subtitleTextSize = 18.sp
  */
 @Composable
 fun Controller(
+    item: com.github.damontecres.wholphin.data.model.BaseItem?,
     title: String?,
     player: Player,
     controllerViewState: ControllerViewState,
@@ -172,57 +174,12 @@ fun Controller(
                     .padding(start = 16.dp)
                     .offset(y = verticalOffset),
         ) {
-            title?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontSize = titleTextSize,
-                    maxLines = 1,
-                    overflow = TextOverflow.MiddleEllipsis,
-                    modifier = Modifier.fillMaxWidth(.75f),
-                )
-            }
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.End),
-            ) {
-                subtitle?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontSize = subtitleTextSize,
-                        maxLines = 1,
-                        overflow = TextOverflow.MiddleEllipsis,
-                        modifier = Modifier.fillMaxWidth(.75f),
-                    )
-                }
-
-                val context = LocalContext.current
-                var endTimeStr by remember { mutableStateOf("...") }
-                LaunchedEffect(player, context) {
-                    while (isActive) {
-                        val remaining =
-                            (player.duration - player.currentPosition)
-                                .div(player.playbackParameters.speed)
-                                .toLong()
-                                .milliseconds
-                        val endTime = LocalTime.now().plusSeconds(remaining.inWholeSeconds)
-                        endTimeStr = formatTime(context, endTime)
-                        delay(1.seconds)
-                    }
-                }
-                Text(
-                    text = stringResource(R.string.ends_at, endTimeStr),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier =
-                        Modifier
-                            .padding(end = 32.dp),
-                )
-            }
+            // Jellyeye: the title's logo (an episode shows its show's), what's playing, and time left / ends at
+            com.github.damontecres.wholphin.ui.jellyeye.JellyeyePlayerTitle(
+                item = item,
+                player = player,
+                modifier = Modifier.fillMaxWidth(.8f),
+            )
         }
         PlaybackControls(
             modifier = Modifier.fillMaxWidth(),

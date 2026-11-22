@@ -2,6 +2,8 @@
 
 package com.github.damontecres.wholphin.ui.playback.overlay
 
+import androidx.tv.material3.ButtonDefaults
+import androidx.compose.foundation.shape.CircleShape
 import android.view.Gravity
 import androidx.annotation.DrawableRes
 import androidx.annotation.OptIn
@@ -388,6 +390,17 @@ fun RightPlaybackButtons(
             onControllerInteraction = onControllerInteraction,
             modifier = Modifier,
         )
+        // Jellyeye: about what's playing (summary, details, cast) without stopping
+        PlaybackFaButton(
+            enabled = true,
+            iconRes = R.string.fa_circle_info,
+            onClick = {
+                onControllerInteraction.invoke()
+                onClickPlaybackDialogType.invoke(PlaybackDialogType.INFO)
+            },
+            onControllerInteraction = onControllerInteraction,
+            modifier = Modifier,
+        )
     }
 }
 
@@ -474,33 +487,31 @@ fun PlaybackButton(
     enabled: Boolean = true,
     interactionSource: MutableInteractionSource? = null,
 ) {
-    val selectedColor = MaterialTheme.colorScheme.border
+    // Jellyeye: round buttons, filled with the theme colour when selected
     Button(
         enabled = enabled,
         onClick = onClick,
-//        shape = ButtonDefaults.shape(CircleShape),
+        shape = ButtonDefaults.shape(CircleShape),
         colors =
             ClickableSurfaceDefaults.colors(
-                containerColor = AppColors.TransparentBlack25,
-                focusedContainerColor = selectedColor,
+                containerColor = Color(0x33FFFFFF),
+                contentColor = Color.White,
+                focusedContainerColor = com.github.damontecres.wholphin.ui.jellyeye.JE.accent,
+                focusedContentColor = com.github.damontecres.wholphin.ui.jellyeye.JE.onAccent,
             ),
-        contentPadding = PaddingValues(4.dp),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.08f),
+        contentPadding = PaddingValues(8.dp),
         interactionSource = interactionSource,
         modifier =
             modifier
-                .size(36.dp, 36.dp)
+                .size(44.dp, 44.dp)
                 .onFocusChanged { onControllerInteraction.invoke() },
     ) {
         Icon(
             modifier = Modifier.fillMaxSize(),
             painter = painterResource(iconRes),
             contentDescription = "",
-            tint =
-                if (LocalTheme.current == AppThemeColors.OLED_BLACK) {
-                    LocalContentColor.current
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                },
+            tint = LocalContentColor.current,
         )
     }
 }
@@ -515,21 +526,24 @@ fun PlaybackFaButton(
     interactionSource: MutableInteractionSource? = null,
     textColor: Color = Color.Unspecified,
 ) {
-    val selectedColor = MaterialTheme.colorScheme.border
+    // Jellyeye: round buttons, filled with the theme colour when selected
     Button(
         enabled = enabled,
         onClick = onClick,
-//        shape = ButtonDefaults.shape(CircleShape),
+        shape = ButtonDefaults.shape(CircleShape),
         colors =
             ClickableSurfaceDefaults.colors(
-                containerColor = AppColors.TransparentBlack25,
-                focusedContainerColor = selectedColor,
+                containerColor = Color(0x33FFFFFF),
+                contentColor = Color.White,
+                focusedContainerColor = com.github.damontecres.wholphin.ui.jellyeye.JE.accent,
+                focusedContentColor = com.github.damontecres.wholphin.ui.jellyeye.JE.onAccent,
             ),
-        contentPadding = PaddingValues(4.dp),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.08f),
+        contentPadding = PaddingValues(8.dp),
         interactionSource = interactionSource,
         modifier =
             modifier
-                .size(36.dp, 36.dp)
+                .size(44.dp, 44.dp)
                 .onFocusChanged { onControllerInteraction.invoke() },
     ) {
         Text(
@@ -537,14 +551,7 @@ fun PlaybackFaButton(
             fontSize = 18.sp,
             fontFamily = FontAwesome,
             textAlign = TextAlign.Center,
-            color =
-                if (textColor.isSpecified) {
-                    textColor
-                } else if (LocalTheme.current == AppThemeColors.OLED_BLACK) {
-                    LocalContentColor.current
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                },
+            color = if (textColor.isSpecified) textColor else LocalContentColor.current,
             modifier =
                 Modifier
                     .fillMaxWidth()
