@@ -58,6 +58,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.foundation.focusGroup
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -534,14 +537,31 @@ private fun LazyListScope.episodeSection(
 ) {
     item(key = "episodes-top") {
         PanelTop("Episodes") {
+            // Coming up from the episodes (or down from the buttons) lands on the season you're
+            // looking at, not whichever pill happens to sit nearest.
+            val selectedPill = remember { FocusRequester() }
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
                 itemVerticalAlignment = Alignment.CenterVertically,
+                modifier =
+                    Modifier
+                        .focusProperties {
+                            onEnter = {
+                                if (requestedFocusDirection == FocusDirection.Up || requestedFocusDirection == FocusDirection.Down) {
+                                    selectedPill.tryRequestFocus()
+                                }
+                            }
+                        }.focusGroup(),
             ) {
                 state.seasons.forEach { season ->
                     val selected = season.id == state.seasonId
-                    JeFocusable(onClick = { viewModel.selectSeason(season.id) }, corner = 20.dp, leftEdge = season === state.seasons.first()) {
+                    JeFocusable(
+                        onClick = { viewModel.selectSeason(season.id) },
+                        corner = 20.dp,
+                        focusRequester = if (selected) selectedPill else null,
+                        leftEdge = season === state.seasons.first(),
+                    ) {
                         Text(
                             season.name ?: "",
                             color = if (selected) JE.accent2 else JE.text,

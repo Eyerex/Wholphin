@@ -981,20 +981,7 @@ internal fun PosterRow(
                             )
                         }
                         if (item.data.userData?.played == true) {
-                            Text(
-                                "✓",
-                                color = JE.onAccent,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                textAlign = TextAlign.Center,
-                                modifier =
-                                    Modifier
-                                        .align(Alignment.BottomStart)
-                                        .padding(5.dp)
-                                        .size(18.dp)
-                                        .clip(CircleShape)
-                                        .background(JE.accent),
-                            )
+                            JeWatchedTick(Modifier.align(Alignment.TopEnd).padding(5.dp))
                         }
                     }
                     Text(
@@ -1129,5 +1116,22 @@ internal fun TitleLogo(
                         .graphicsLayer { alpha = if (ready) 1f else 0f },
             )
         }
+    }
+}
+
+
+/** The one watched tick used on every cover: a round accent badge, always top-right. */
+@Composable
+fun JeWatchedTick(modifier: Modifier = Modifier) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier =
+            modifier
+                .size(22.dp)
+                .clip(CircleShape)
+                .background(JE.accent)
+                .border(1.dp, Color(0x66000000), CircleShape),
+    ) {
+        Text("✓", color = JE.onAccent, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
     }
 }

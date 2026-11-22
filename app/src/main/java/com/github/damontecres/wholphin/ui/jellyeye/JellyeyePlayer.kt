@@ -1,5 +1,13 @@
 package com.github.damontecres.wholphin.ui.jellyeye
 
+import kotlinx.coroutines.launch
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
@@ -403,10 +411,25 @@ fun JellyeyePlaybackInfo(
             delay(50)
         }
     }
+    // Nothing in the middle can take focus, so Up/Down scroll it while you stay on "Back to watching"
+    val scroll = rememberScrollState()
+    val scope = rememberCoroutineScope()
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(
             Modifier
-                .width(720.dp)
+                .onPreviewKeyEvent { e ->
+                    val down = e.key == Key.DirectionDown
+                    val up = e.key == Key.DirectionUp
+                    when {
+                        !down && !up -> false
+                        down && !scroll.canScrollForward -> false
+                        up && !scroll.canScrollBackward -> false
+                        else -> {
+                            if (e.type == KeyEventType.KeyDown) scope.launch { scroll.animateScrollBy(if (down) 220f else -220f) }
+                            true
+                        }
+                    }
+                }.width(720.dp)
                 .heightIn(max = 470.dp)
                 .clip(RoundedCornerShape(24.dp))
                 .background(JE.bg.copy(alpha = 0.97f))
@@ -419,7 +442,7 @@ fun JellyeyePlaybackInfo(
             Column(
                 Modifier
                     .weight(1f, fill = false)
-                    .verticalScroll(rememberScrollState()),
+                    .verticalScroll(scroll),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item.data.overview?.takeIf { it.isNotBlank() }?.let {
@@ -460,7 +483,19 @@ fun JellyeyePlaybackInfo(
                     }
                 }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                if (scroll.canScrollForward || scroll.canScrollBackward) {
+                    Text(
+                        when {
+                            scroll.canScrollForward && scroll.canScrollBackward -> "▲ ▼  to scroll"
+                            scroll.canScrollForward -> "▼  more below"
+                            else -> "▲  back to the top"
+                        },
+                        color = JE.dim,
+                        fontSize = 11.sp,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
                 PillButton("Back to watching", onClick = onDismiss, primary = true, focusRequester = closeFocus)
             }
         }

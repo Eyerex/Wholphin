@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import com.github.damontecres.wholphin.preferences.AppThemeColors
+import com.github.damontecres.wholphin.ui.jellyeye.JE
 import com.github.damontecres.wholphin.ui.PreviewTvSpec
 import com.github.damontecres.wholphin.ui.theme.LocalTheme
 import com.github.damontecres.wholphin.ui.theme.WholphinTheme
@@ -27,11 +28,12 @@ fun WatchedIcon(
     Icon(
         imageVector = Icons.Default.Check,
         contentDescription = null,
-        tint = WatchedIconColor(),
+        // Jellyeye: the same orange badge as JeWatchedTick on every cover
+        tint = JE.onAccent,
         modifier =
             modifier
-                .background(WatchedIconBackground(), shape = CircleShape)
-                .border(.5.dp, Color.Black, CircleShape)
+                .background(JE.accent, shape = CircleShape)
+                .border(1.dp, Color(0x66000000), CircleShape)
                 .padding(padding),
     )
 }
