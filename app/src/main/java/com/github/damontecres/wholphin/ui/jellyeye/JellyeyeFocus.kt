@@ -5,7 +5,11 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.RememberObserver
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusRequester
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -85,6 +89,56 @@ internal fun rememberReturnFocusMap(
 ): Map<UUID, FocusRequester> {
     val id = memory.id
     return remember(id, extra) { if (id != null) extra + (id to restore) else extra }
+}
+
+/**
+ * A page's "come back here" target must sit on one tile only. If the same title is drawn twice on a page, the
+ * first tile to appear keeps it and the other goes without, so the page never has two tiles answering to it.
+ */
+internal object JeFocusClaims {
+    private val owners = java.util.WeakHashMap<FocusRequester, Any>()
+
+    fun claim(
+        requester: FocusRequester,
+        who: Any,
+    ): Boolean {
+        val current = owners[requester]
+        if (current != null && current !== who) return false
+        owners[requester] = who
+        return true
+    }
+
+    fun release(
+        requester: FocusRequester,
+        who: Any,
+    ) {
+        if (owners[requester] === who) owners.remove(requester)
+    }
+}
+
+private class SoleClaim(
+    val requester: FocusRequester,
+) : RememberObserver {
+    var held by mutableStateOf(false)
+
+    override fun onRemembered() {
+        held = JeFocusClaims.claim(requester, this)
+    }
+
+    override fun onForgotten() {
+        JeFocusClaims.release(requester, this)
+        held = false
+    }
+
+    override fun onAbandoned() {}
+}
+
+/** The requester for this tile, or null if another tile on the page already has it (see [JeFocusClaims]). */
+@Composable
+internal fun soleRequester(requester: FocusRequester?): FocusRequester? {
+    if (requester == null) return null
+    val claim = remember(requester) { SoleClaim(requester) }
+    return if (claim.held) requester else null
 }
 
 /**

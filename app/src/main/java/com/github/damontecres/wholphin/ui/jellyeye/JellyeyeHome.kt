@@ -203,7 +203,8 @@ internal object JeLayout {
     val bannerHeight = 372.dp
     val pageMargin = 36.dp
     val pageTop = 16.dp
-    val pageBottom = 48.dp
+    // at least the scroll margin (10% of the screen), so the bottom row of the last panel can always be shown in full
+    val pageBottom = 60.dp
     val panelGap = 16.dp
 }
 
@@ -273,10 +274,11 @@ internal fun JeTile(
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val menu = if (leftEdge) LocalMenuFocus.current else null
+    val requester = soleRequester(focusRequester)
     Column(
         modifier =
             modifier
-                .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+                .then(if (requester != null) Modifier.focusRequester(requester) else Modifier)
                 .then(if (menu != null) Modifier.leftOpensMenu(menu) else Modifier)
                 .then(
                     if (onLongClick != null) {
@@ -546,6 +548,9 @@ fun JellyeyeHome(
         val memory = viewModel.focusMemory
         val restoreTile = remember { FocusRequester() }
         val focusMap = rememberReturnFocusMap(memory, restoreTile)
+        // each title appears in one section only, so coming back to it can only ever select one tile
+        val seasonOn = JeSettings.showSeasonalPanel
+        val sections = remember(state, seasonOn) { homeSections(state, seasonOn) }
         PageFocus(memory, listState, ready = state.spotlight.isNotEmpty(), restore = restoreTile, main = playFocus)
         // opening or playing a title notes where you were, for coming back
         val open = { item: BaseItem -> memory.leaving(item.id, listState); viewModel.open(item) }
@@ -589,39 +594,79 @@ fun JellyeyeHome(
                     }
                 }
             }
-            if (state.recommendedShows.isNotEmpty()) {
+            if (sections.shows.isNotEmpty()) {
                 item(key = "shows") {
                     SectionTile("Recommended TV shows") {
-                        PosterGrid(state.recommendedShows, rows = 2, onClick = open, focusRequesters = focusMap)
+                        PosterGrid(sections.shows, rows = 2, onClick = open, focusRequesters = focusMap)
                     }
                 }
             }
-            if (state.recommendedFilms.isNotEmpty()) {
+            if (sections.films.isNotEmpty()) {
                 item(key = "films") {
                     SectionTile("Recommended films") {
-                        PosterGrid(state.recommendedFilms, rows = 2, onClick = open, focusRequesters = focusMap)
+                        PosterGrid(sections.films, rows = 2, onClick = open, focusRequesters = focusMap)
                     }
                 }
             }
             val season = state.season
-            if (!JeSettings.showSeasonalPanel) {
+            if (!seasonOn) {
                 // switched off in Settings → Jellyeye
-            } else if (season != null && state.seasonal.isNotEmpty()) {
+            } else if (season != null && sections.seasonal.isNotEmpty()) {
                 item(key = "season") {
-                    SeasonPanel(season, state.seasonal, onClick = open, focusRequesters = focusMap)
+                    SeasonPanel(season, sections.seasonal, onClick = open, focusRequesters = focusMap)
                 }
-            } else if (state.gems.isNotEmpty()) {
+            } else if (sections.gems.isNotEmpty()) {
                 // no holiday right now: the same spot shows highly rated titles you haven't seen
                 item(key = "gems") {
                     SectionTile("Hidden gems") {
                         Text("Highly rated in your library, and you haven't watched them yet", color = JE.dim, fontSize = 12.sp)
-                        PosterGrid(state.gems, rows = 2, onClick = open, focusRequesters = focusMap)
+                        PosterGrid(sections.gems, rows = 2, onClick = open, focusRequesters = focusMap)
                     }
                 }
             }
         }
         }
     }
+}
+
+/** What each home section actually shows (a 2-row grid of 8 across). */
+private const val HOME_GRID = 16
+
+internal class HomeSections(
+    val shows: List<BaseItem>,
+    val films: List<BaseItem>,
+    val seasonal: List<BaseItem>,
+    val gems: List<BaseItem>,
+)
+
+/**
+ * Shares the titles out so none appears twice on the home page: Pick up first, then the holiday panel, then
+ * the recommendations, then Hidden gems. A title in two places meant two tiles sharing one "come back here"
+ * focus target, which could leave the page fighting itself over which one to select.
+ */
+internal fun homeSections(
+    state: JellyeyeHomeState,
+    seasonOn: Boolean,
+): HomeSections {
+    val taken = HashSet<UUID>()
+    state.pickUp.forEach { p ->
+        taken.add(p.id)
+        p.data.seriesId?.let { taken.add(it) }
+    }
+
+    fun List<BaseItem>.fresh(): List<BaseItem> {
+        val out = ArrayList<BaseItem>(HOME_GRID)
+        for (item in this) {
+            if (out.size >= HOME_GRID) break
+            if (taken.add(item.id)) out.add(item)
+        }
+        return out
+    }
+    val seasonal = if (seasonOn && state.season != null) state.seasonal.fresh() else emptyList()
+    val shows = state.recommendedShows.fresh()
+    val films = state.recommendedFilms.fresh()
+    val gems = state.gems.fresh()
+    return HomeSections(shows, films, seasonal, gems)
 }
 
 /* ------------------------------------------------------------------
