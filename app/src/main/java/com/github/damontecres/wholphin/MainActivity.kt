@@ -307,6 +307,11 @@ class MainActivity : AppCompatActivity() {
             val handled = super.dispatchKeyEvent(event)
             com.github.damontecres.wholphin.util.FreezeRecorder
                 .key(event, handled)
+            if (!handled && event.action == KeyEvent.ACTION_DOWN) {
+                // Jellyeye: a press went nowhere; if that's because nothing is selected, select the page again
+                com.github.damontecres.wholphin.ui.jellyeye.JePageFocus
+                    .rescue(lifecycleScope)
+            }
             return handled
         }
     }
@@ -315,6 +320,12 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         Timber.d("onResume")
         viewModel.appResume()
+        // Jellyeye: coming back to the app with nothing selected, select the page again
+        lifecycleScope.launch {
+            kotlinx.coroutines.delay(800)
+            com.github.damontecres.wholphin.ui.jellyeye.JePageFocus
+                .rescue(this)
+        }
         lifecycleScope.launchDefault {
             screensaverService.pulse()
         }

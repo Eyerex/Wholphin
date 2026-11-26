@@ -15,7 +15,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.focus.FocusDirection
 import com.github.damontecres.wholphin.util.FreezeRecorder
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.util.UUID
 
 /*
@@ -157,7 +159,7 @@ internal fun PageFocus(
 ) {
     DisposableEffect(memory) {
         memory.away = false
-        JePageFocus.register(main)
+        JePageFocus.register(main, list)
         onDispose {
             JePageFocus.unregister(main)
             if (!memory.away) memory.forget()
@@ -177,6 +179,15 @@ internal fun PageFocus(
             }
             FreezeRecorder.note("focus: the title you came from isn't on the page")
         }
+        // The main button is at the top of the page. Coming back to a page that was left scrolled down (the list
+        // remembers its place), it isn't drawn, so it can't be selected and nothing on the page would be: the
+        // remote then does nothing at all. So go back to the top first.
+        list?.let {
+            if (it.firstVisibleItemIndex != 0 || it.firstVisibleItemScrollOffset != 0) {
+                FreezeRecorder.note("focus: back to the top for the page's main button")
+                it.scrollToItem(0)
+            }
+        }
         delay(60)
         repeat(40) { n ->
             if (main.focusNow()) {
@@ -192,13 +203,51 @@ internal fun PageFocus(
 /** The page on screen's main focus target, for handing back focus that strayed onto the menu. */
 object JePageFocus {
     private var current: FocusRequester? = null
+    private var currentList: LazyListState? = null
+    private var rescuing = false
 
-    fun register(target: FocusRequester) {
+    /** Whether anything in the app (the page or the menu) is selected; kept up to date by the nav drawer. */
+    @Volatile var anythingSelected = false
+
+    fun register(
+        target: FocusRequester,
+        list: LazyListState? = null,
+    ) {
         current = target
+        currentList = list
     }
 
     fun unregister(target: FocusRequester) {
-        if (current === target) current = null
+        if (current === target) {
+            current = null
+            currentList = null
+        }
+    }
+
+    /**
+     * Last line of defence: a remote press went nowhere because nothing at all is selected. Go to the top of
+     * the page and select its main button, so the remote works again.
+     */
+    fun rescue(scope: CoroutineScope) {
+        if (anythingSelected || rescuing) return
+        val page = current ?: return
+        rescuing = true
+        FreezeRecorder.note("focus: nothing was selected, rescuing the page")
+        scope.launch {
+            try {
+                currentList?.scrollToItem(0)
+                repeat(25) {
+                    if (page.focusNow()) {
+                        FreezeRecorder.note("focus: rescued")
+                        return@launch
+                    }
+                    delay(40)
+                }
+                FreezeRecorder.note("focus: rescue failed")
+            } finally {
+                rescuing = false
+            }
+        }
     }
 
     /** Is a Jellyeye page on screen to hand focus back to? */
