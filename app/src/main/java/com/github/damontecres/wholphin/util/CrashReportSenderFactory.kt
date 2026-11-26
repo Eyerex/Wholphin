@@ -71,7 +71,7 @@ class CrashReportSender : ReportSender {
     }
 }
 
-private fun MostRecentServer.createApi(context: Context): ApiClient? =
+internal fun MostRecentServer.createApi(context: Context): ApiClient? =
     (this as? MostRecentServer.ServerAndUser)?.let {
         val okHttpClient =
             OkHttpClient

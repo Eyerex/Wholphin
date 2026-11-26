@@ -14,6 +14,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.focus.FocusDirection
+import com.github.damontecres.wholphin.util.FreezeRecorder
 import kotlinx.coroutines.delay
 import java.util.UUID
 
@@ -167,16 +168,24 @@ internal fun PageFocus(
         if (!ready) return@LaunchedEffect
         if (backTo != null) {
             list?.let { memory.scrollBack(it) }
-            repeat(30) {
-                if (restore.focusNow()) return@LaunchedEffect
+            repeat(30) { n ->
+                if (restore.focusNow()) {
+                    FreezeRecorder.note("focus: back on the title you came from (try ${n + 1})")
+                    return@LaunchedEffect
+                }
                 delay(40)
             }
+            FreezeRecorder.note("focus: the title you came from isn't on the page")
         }
         delay(60)
-        repeat(40) {
-            if (main.focusNow()) return@LaunchedEffect
+        repeat(40) { n ->
+            if (main.focusNow()) {
+                FreezeRecorder.note("focus: page's main button (try ${n + 1})")
+                return@LaunchedEffect
+            }
             delay(50)
         }
+        FreezeRecorder.note("focus: NOTHING could be selected on this page")
     }
 }
 
@@ -200,11 +209,17 @@ object JePageFocus {
      * Jellyeye page, or it never became ready (the menu then opens as normal, so focus is never stuck).
      */
     suspend fun takeBack(): Boolean {
+        FreezeRecorder.note("focus: strayed onto the closed menu, handing it back to the page")
         repeat(25) {
-            val page = current ?: return false
+            val page = current
+            if (page == null) {
+                FreezeRecorder.note("focus: no page to hand it back to, opening the menu")
+                return false
+            }
             if (page.focusNow()) return true
             delay(40)
         }
+        FreezeRecorder.note("focus: page wouldn't take it back, opening the menu")
         return false
     }
 }

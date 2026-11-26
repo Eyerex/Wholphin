@@ -86,6 +86,9 @@ class NavigationManager
         private fun log() {
             val dest = backStack.lastOrNull().toString()
             Timber.i("Current Destination: %s", dest)
+            com.github.damontecres.wholphin.util.FreezeRecorder.note(
+                "page: ${backStack.joinToString(" > ") { it::class.simpleName ?: "?" }}",
+            )
             ACRA.errorReporter.putCustomData("destination", dest)
         }
     }

@@ -230,6 +230,9 @@ class JellyeyeHomeViewModel
                         gems = gems,
                     )
                 }
+                com.github.damontecres.wholphin.util.FreezeRecorder.note(
+                    "home: updated (pick up ${pickUp.size}, seasonal ${seasonal.size}, gems ${gems.size})",
+                )
                 saveCache(userId, _state.value)
             }
 

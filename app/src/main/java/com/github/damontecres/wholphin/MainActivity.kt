@@ -164,6 +164,9 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         instance = this
+        // Jellyeye: watches for lock-ups and sends a report to the server's logs when one happens
+        com.github.damontecres.wholphin.util.FreezeRecorder
+            .start(this)
         Timber.i("MainActivity.onCreate: savedInstanceState is null=${savedInstanceState == null}")
         lifecycle.addObserver(playbackLifecycleObserver)
 
@@ -301,7 +304,10 @@ class MainActivity : AppCompatActivity() {
             return true
         } else {
             screensaverService.pulse()
-            return super.dispatchKeyEvent(event)
+            val handled = super.dispatchKeyEvent(event)
+            com.github.damontecres.wholphin.util.FreezeRecorder
+                .key(event, handled)
+            return handled
         }
     }
 
